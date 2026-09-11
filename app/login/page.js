@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
+import Button from '../../lib/Button';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -27,7 +28,11 @@ export default function LoginPage() {
   return (
     <div className="center-screen">
       <form onSubmit={handleSubmit} className="card" style={{ width: 320 }}>
-        <h2 style={{ textAlign: 'center', marginTop: 0 }}>تسجيل الدخول</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 8 }}>
+          <img src="/icons/icon-192.png" alt="حصتي" style={{ width: 64, height: 64, borderRadius: 16 }} />
+          <h2 style={{ margin: '10px 0 0' }}>حصتي</h2>
+          <div className="muted">تسجيل الدخول</div>
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <input
             type="email"
@@ -44,9 +49,9 @@ export default function LoginPage() {
             required
           />
           {error && <div className="error-text">{error}</div>}
-          <button type="submit" className="btn" disabled={loading}>
-            {loading ? 'جارِ الدخول...' : 'دخول'}
-          </button>
+          <Button type="submit" loading={loading} style={{ width: '100%', justifyContent: 'center' }}>
+            دخول
+          </Button>
         </div>
       </form>
     </div>

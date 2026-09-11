@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '../../../lib/supabaseClient';
+import Button from '../../../lib/Button';
 
 export default function StudentsPage() {
   const [students, setStudents] = useState([]);
@@ -14,6 +15,7 @@ export default function StudentsPage() {
   const emptyForm = { name: '', student_number: '', parent_phone: '', grade_id: '', group_id: '' };
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   const loadAll = async () => {
     setLoading(true);
@@ -44,6 +46,7 @@ export default function StudentsPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) return;
+    setSaving(true);
     const payload = {
       name: form.name.trim(),
       student_number: form.student_number.trim() || null,
@@ -57,7 +60,8 @@ export default function StudentsPage() {
       await supabase.from('students').insert(payload);
     }
     resetForm();
-    loadAll();
+    await loadAll();
+    setSaving(false);
   };
 
   const startEdit = (student) => {
@@ -135,9 +139,9 @@ export default function StudentsPage() {
           </select>
         </div>
         <div className="row" style={{ marginTop: 8 }}>
-          <button type="submit" className="btn">{editingId ? 'حفظ التعديل' : 'إضافة طالب'}</button>
+          <Button type="submit" loading={saving}>{editingId ? 'حفظ التعديل' : 'إضافة طالب'}</Button>
           {editingId && (
-            <button type="button" className="btn btn-outline" onClick={resetForm}>إلغاء</button>
+            <Button type="button" variant="outline" onClick={resetForm}>إلغاء</Button>
           )}
         </div>
       </form>

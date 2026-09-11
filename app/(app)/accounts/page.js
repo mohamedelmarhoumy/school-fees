@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { buildWhatsAppLink } from '../../../lib/whatsapp';
 import { ARABIC_MONTHS, PAYMENT_STATUS_COLORS } from '../../../lib/constants';
+import Button from '../../../lib/Button';
 
 const now = new Date();
 
@@ -16,6 +17,7 @@ export default function AccountsPage() {
   const [editingStudentId, setEditingStudentId] = useState(null);
   const [editPaid, setEditPaid] = useState('');
   const [editDiscount, setEditDiscount] = useState('');
+  const [savingPayment, setSavingPayment] = useState(false);
 
   const computeStatus = (due, paid, discount) => {
     const covered = Number(paid) + Number(discount);
@@ -84,13 +86,15 @@ export default function AccountsPage() {
     const discount = Number(editDiscount) || 0;
     const status = computeStatus(due, paid, discount);
 
+    setSavingPayment(true);
     await supabase
       .from('payments')
       .update({ amount_paid: paid, discount_amount: discount, status, updated_at: new Date().toISOString() })
       .eq('id', row.payment.id);
 
     setEditingStudentId(null);
-    load();
+    await load();
+    setSavingPayment(false);
   };
 
   const filtered = rows.filter((r) => r.student.name.toLowerCase().includes(search.toLowerCase()));
@@ -139,8 +143,10 @@ export default function AccountsPage() {
               </div>
               <div className="row">
                 {status !== 'paid' && (
-                  <a
-                    className="btn btn-whatsapp btn-sm"
+                  <Button
+                    as="a"
+                    variant="whatsapp"
+                    size="sm"
                     href={buildWhatsAppLink(
                       row.student.parent_phone,
                       `تذكير: يرجى سداد اشتراك ${ARABIC_MONTHS[month - 1]} ${year} للطالب ${row.student.name}. المتبقي: ${(
@@ -151,9 +157,9 @@ export default function AccountsPage() {
                     rel="noreferrer"
                   >
                     واتساب
-                  </a>
+                  </Button>
                 )}
-                <button className="btn btn-outline btn-sm" onClick={() => startEdit(row)}>دفع</button>
+                <Button variant="outline" size="sm" onClick={() => startEdit(row)}>دفع</Button>
               </div>
             </div>
 
@@ -174,8 +180,8 @@ export default function AccountsPage() {
                   onChange={(e) => setEditDiscount(e.target.value)}
                   style={{ flex: 1 }}
                 />
-                <button className="btn btn-sm" onClick={() => savePayment(row)}>حفظ</button>
-                <button className="btn btn-outline btn-sm" onClick={() => setEditingStudentId(null)}>إلغاء</button>
+                <Button size="sm" loading={savingPayment} onClick={() => savePayment(row)}>حفظ</Button>
+                <Button variant="outline" size="sm" onClick={() => setEditingStudentId(null)}>إلغاء</Button>
               </div>
             )}
           </div>

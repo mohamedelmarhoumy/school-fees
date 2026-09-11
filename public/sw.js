@@ -1,5 +1,5 @@
-const CACHE_NAME = 'school-app-shell-v1';
-const APP_SHELL = ['/', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
+const CACHE_NAME = 'school-app-shell-v2';
+const APP_SHELL = ['/', '/manifest.json', '/favicon.ico', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/logo-header.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

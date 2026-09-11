@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import { buildWhatsAppLink } from '../../../lib/whatsapp';
 import { ATTENDANCE_STATUS_LABELS } from '../../../lib/constants';
+import Button from '../../../lib/Button';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -168,8 +169,10 @@ function AttendanceContent() {
               </div>
               <div className="row">
                 {status === 'absent' && (
-                  <a
-                    className="btn btn-whatsapp btn-sm"
+                  <Button
+                    as="a"
+                    variant="whatsapp"
+                    size="sm"
                     href={buildWhatsAppLink(
                       row.student.parent_phone,
                       `تنويه: الطالب ${row.student.name} كان غائباً عن الحصة بتاريخ ${date}. برجاء المتابعة، وشكراً.`
@@ -178,7 +181,7 @@ function AttendanceContent() {
                     rel="noreferrer"
                   >
                     واتساب
-                  </a>
+                  </Button>
                 )}
                 <div className="segmented">
                   {['present', 'late', 'absent'].map((s) => (

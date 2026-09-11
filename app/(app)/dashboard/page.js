@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { supabase } from '../../../lib/supabaseClient';
 import { downloadCsv } from '../../../lib/exportCsv';
 import { ARABIC_MONTHS, WEEKDAY_LABELS } from '../../../lib/constants';
+import Button from '../../../lib/Button';
 
 const now = new Date();
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -15,6 +16,8 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState({ paid: 0, partial: 0, unpaid: 0, totalDue: 0, totalPaid: 0 });
   const [todaysGroups, setTodaysGroups] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exportingPayments, setExportingPayments] = useState(false);
+  const [exportingAttendance, setExportingAttendance] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -41,6 +44,7 @@ export default function DashboardPage() {
   }, [year, month]);
 
   const exportPayments = async () => {
+    setExportingPayments(true);
     const { data: payments } = await supabase
       .from('payments')
       .select('*, students(name)')
@@ -58,16 +62,19 @@ export default function DashboardPage() {
       ['اسم الطالب', 'المستحق', 'المدفوع', 'الخصم', 'الحالة'],
       rows
     );
+    setExportingPayments(false);
   };
 
   const exportAttendanceToday = async () => {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    setExportingAttendance(true);
+    const today = new Date().toISOString().slice(0, 10);
     const { data: records } = await supabase
       .from('attendance')
       .select('*, students(name)')
-      .eq('date', todayStr);
+      .eq('date', today);
     const rows = (records || []).map((r) => [r.students?.name || '', r.date, r.status]);
-    downloadCsv(`حضور-${todayStr}.csv`, ['اسم الطالب', 'التاريخ', 'الحالة'], rows);
+    downloadCsv(`حضور-${today}.csv`, ['اسم الطالب', 'التاريخ', 'الحالة'], rows);
+    setExportingAttendance(false);
   };
 
   return (
@@ -102,29 +109,33 @@ export default function DashboardPage() {
 
           <div className="card">
             <h3 style={{ marginTop: 0 }}>{ARABIC_MONTHS[month - 1]} {year}</h3>
-            <div className="row" style={{ justifyContent: 'space-evenly', textAlign: 'center' }}>
-              <div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#16a34a' }}>{summary.paid || 0}</div>
-                <div className="muted">دافع</div>
+            <div className="stat-grid">
+              <div className="stat-card stat-paid">
+                <div className="stat-value">{summary.paid || 0}</div>
+                <div className="stat-label">دافع</div>
               </div>
-              <div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#ea580c' }}>{summary.partial || 0}</div>
-                <div className="muted">جزئي</div>
+              <div className="stat-card stat-partial">
+                <div className="stat-value">{summary.partial || 0}</div>
+                <div className="stat-label">جزئي</div>
               </div>
-              <div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#dc2626' }}>{summary.unpaid || 0}</div>
-                <div className="muted">لم يدفع</div>
+              <div className="stat-card stat-unpaid">
+                <div className="stat-value">{summary.unpaid || 0}</div>
+                <div className="stat-label">لم يدفع</div>
               </div>
             </div>
-            <div className="muted" style={{ marginTop: 10, textAlign: 'center' }}>
+            <div className="muted" style={{ marginTop: 12, textAlign: 'center' }}>
               إجمالي المستحق: {summary.totalDue} | إجمالي المحصّل: {summary.totalPaid}
             </div>
           </div>
 
           <div className="card">
             <div className="row">
-              <button className="btn" onClick={exportPayments}>تصدير تحصيل الشهر (CSV)</button>
-              <button className="btn btn-outline" onClick={exportAttendanceToday}>تصدير حضور اليوم (CSV)</button>
+              <Button variant="primary" loading={exportingPayments} onClick={exportPayments}>
+                تصدير تحصيل الشهر (CSV)
+              </Button>
+              <Button variant="outline" loading={exportingAttendance} onClick={exportAttendanceToday}>
+                تصدير حضور اليوم (CSV)
+              </Button>
             </div>
             <div className="muted" style={{ marginTop: 6 }}>
               الملفات تفتح مباشرة في Excel.

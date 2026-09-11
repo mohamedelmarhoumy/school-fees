@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { WEEKDAY_LABELS } from '../../../lib/constants';
+import Button from '../../../lib/Button';
 
 const emptyGroupForm = { name: '', days: [], start_time: '', end_time: '' };
 
@@ -48,6 +49,8 @@ export default function GradesPage() {
   const [editGradeFee, setEditGradeFee] = useState('');
   const [editingGroupId, setEditingGroupId] = useState(null);
   const [editGroupForm, setEditGroupForm] = useState(emptyGroupForm);
+  const [addingGrade, setAddingGrade] = useState(false);
+  const [addingGroupFor, setAddingGroupFor] = useState(null);
 
   const loadAll = async () => {
     setLoading(true);
@@ -70,13 +73,15 @@ export default function GradesPage() {
   const addGrade = async (e) => {
     e.preventDefault();
     if (!newGradeName.trim()) return;
+    setAddingGrade(true);
     await supabase.from('grades').insert({
       name: newGradeName.trim(),
       monthly_fee: Number(newGradeFee) || 0,
     });
     setNewGradeName('');
     setNewGradeFee('');
-    loadAll();
+    await loadAll();
+    setAddingGrade(false);
   };
 
   const saveGradeEdit = async (id) => {
@@ -109,6 +114,7 @@ export default function GradesPage() {
   const addGroup = async (gradeId) => {
     const form = getNewGroupForm(gradeId);
     if (!form.name.trim()) return;
+    setAddingGroupFor(gradeId);
     await supabase.from('groups_table').insert({
       grade_id: gradeId,
       name: form.name.trim(),
@@ -117,7 +123,8 @@ export default function GradesPage() {
       end_time: form.end_time || null,
     });
     setNewGroupFormByGrade((s) => ({ ...s, [gradeId]: emptyGroupForm }));
-    loadAll();
+    await loadAll();
+    setAddingGroupFor(null);
   };
 
   const startEditGroup = (group) => {
@@ -177,7 +184,7 @@ export default function GradesPage() {
           onChange={(e) => setNewGradeFee(e.target.value)}
           style={{ flex: 1 }}
         />
-        <button type="submit" className="btn">إضافة صف</button>
+        <Button type="submit" loading={addingGrade}>إضافة صف</Button>
       </form>
 
       {grades.length === 0 && <div className="muted">لا توجد صفوف بعد — أضف أول صف فوق.</div>}
@@ -291,9 +298,9 @@ export default function GradesPage() {
                 <div style={{ marginTop: 6 }}>
                   <DaysPicker selectedDays={newGroupForm.days} onToggle={(d) => toggleNewGroupDay(grade.id, d)} />
                 </div>
-                <button className="btn btn-sm" style={{ marginTop: 6 }} onClick={() => addGroup(grade.id)}>
+                <Button size="sm" style={{ marginTop: 6 }} loading={addingGroupFor === grade.id} onClick={() => addGroup(grade.id)}>
                   إضافة مجموعة
-                </button>
+                </Button>
               </div>
             </div>
           </div>

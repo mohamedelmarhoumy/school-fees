@@ -2,9 +2,13 @@ import './globals.css';
 import ServiceWorkerRegister from './service-worker-register';
 
 export const metadata = {
-  title: 'سجل المدرسة',
+  title: 'حصتي',
   description: 'تطبيق إدارة الطلاب والحضور والاشتراكات',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/icons/icon-192.png',
+  },
 };
 
 export const viewport = {
@@ -20,7 +24,7 @@ export default function RootLayout({ children }) {
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="سجل المدرسة" />
+        <meta name="apple-mobile-web-app-title" content="حصتي" />
       </head>
       <body>
         <ServiceWorkerRegister />
