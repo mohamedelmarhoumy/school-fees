@@ -25,6 +25,11 @@ export default function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="حصتي" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{document.documentElement.setAttribute('data-theme', localStorage.getItem('hissati-theme') || 'light');}catch(e){}`,
+          }}
+        />
       </head>
       <body>
         <ServiceWorkerRegister />

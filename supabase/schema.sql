@@ -58,6 +58,14 @@ create table if not exists attendance (
   unique (student_id, date)
 );
 
+create table if not exists payment_transactions (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references students(id) on delete cascade,
+  payment_id uuid references payments(id) on delete set null,
+  amount numeric not null,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists idx_students_group on students (group_id);
 create index if not exists idx_payments_month on payments (year, month);
 create index if not exists idx_attendance_group_date on attendance (group_id, date);
@@ -69,6 +77,7 @@ alter table groups_table enable row level security;
 alter table students enable row level security;
 alter table payments enable row level security;
 alter table attendance enable row level security;
+alter table payment_transactions enable row level security;
 
 create policy "authenticated full access" on grades
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
@@ -83,4 +92,7 @@ create policy "authenticated full access" on payments
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 create policy "authenticated full access" on attendance
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+create policy "authenticated full access" on payment_transactions
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');

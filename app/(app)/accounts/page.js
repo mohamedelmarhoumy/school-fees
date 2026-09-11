@@ -5,8 +5,19 @@ import { supabase } from '../../../lib/supabaseClient';
 import { buildWhatsAppLink } from '../../../lib/whatsapp';
 import { ARABIC_MONTHS, PAYMENT_STATUS_COLORS } from '../../../lib/constants';
 import Button from '../../../lib/Button';
+import { SkeletonCards } from '../../../lib/Skeleton';
+import EmptyState from '../../../lib/EmptyState';
+import { downloadCsv } from '../../../lib/exportCsv';
 
 const now = new Date();
+
+function dayBounds(date) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
 
 export default function AccountsPage() {
   const [year, setYear] = useState(now.getFullYear());
@@ -18,6 +29,9 @@ export default function AccountsPage() {
   const [editPaid, setEditPaid] = useState('');
   const [editDiscount, setEditDiscount] = useState('');
   const [savingPayment, setSavingPayment] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [todayTransactions, setTodayTransactions] = useState([]);
+  const [loadingToday, setLoadingToday] = useState(true);
 
   const computeStatus = (due, paid, discount) => {
     const covered = Number(paid) + Number(discount);
@@ -41,7 +55,6 @@ export default function AccountsPage() {
       paymentsByStudent[p.student_id] = p;
     });
 
-    // ensure month generated: أنشئ سجل "لم يدفع" لأي طالب ليس له سجل هذا الشهر
     const toInsert = (students || [])
       .filter((s) => !paymentsByStudent[s.id])
       .map((s) => ({
@@ -66,14 +79,30 @@ export default function AccountsPage() {
     setLoading(false);
   };
 
+  const loadTodayTransactions = async () => {
+    setLoadingToday(true);
+    const { start, end } = dayBounds(new Date());
+    const { data } = await supabase
+      .from('payment_transactions')
+      .select('*, students(name)')
+      .gte('created_at', start)
+      .lte('created_at', end)
+      .order('created_at', { ascending: false });
+    setTodayTransactions(data || []);
+    setLoadingToday(false);
+  };
+
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, month]);
 
+  useEffect(() => {
+    loadTodayTransactions();
+  }, []);
+
   const startEdit = (row) => {
     setEditingStudentId(row.student.id);
-    // اترك الحقل فاضي بدل ما نحط صفر، عشان المدرس ميحتاجش يمسحه كل مرة قبل الكتابة
     const paid = row.payment?.amount_paid;
     const discount = row.payment?.discount_amount;
     setEditPaid(paid ? String(paid) : '');
@@ -85,41 +114,141 @@ export default function AccountsPage() {
     const paid = Number(editPaid) || 0;
     const discount = Number(editDiscount) || 0;
     const status = computeStatus(due, paid, discount);
+    const previousPaid = Number(row.payment?.amount_paid || 0);
+    const delta = paid - previousPaid;
 
     setSavingPayment(true);
+
     await supabase
       .from('payments')
       .update({ amount_paid: paid, discount_amount: discount, status, updated_at: new Date().toISOString() })
       .eq('id', row.payment.id);
 
+    if (delta !== 0) {
+      await supabase.from('payment_transactions').insert({
+        student_id: row.student.id,
+        payment_id: row.payment.id,
+        amount: delta,
+      });
+    }
+
     setEditingStudentId(null);
     await load();
+    await loadTodayTransactions();
     setSavingPayment(false);
+  };
+
+  const exportPayments = async () => {
+    setExporting(true);
+    const { data: payments } = await supabase
+      .from('payments')
+      .select('*, students(name)')
+      .eq('year', year)
+      .eq('month', month);
+    const csvRows = (payments || []).map((p) => [
+      p.students?.name || '',
+      p.amount_due,
+      p.amount_paid,
+      p.discount_amount,
+      p.status,
+    ]);
+    downloadCsv(
+      `تحصيل-${ARABIC_MONTHS[month - 1]}-${year}.csv`,
+      ['اسم الطالب', 'المستحق', 'المدفوع', 'الخصم', 'الحالة'],
+      csvRows
+    );
+    setExporting(false);
   };
 
   const filtered = rows.filter((r) => r.student.name.toLowerCase().includes(search.toLowerCase()));
 
   const totalDue = rows.reduce((sum, r) => sum + Number(r.payment?.amount_due || 0), 0);
   const totalPaid = rows.reduce((sum, r) => sum + Number(r.payment?.amount_paid || 0), 0);
+  const statusCounts = rows.reduce(
+    (acc, r) => {
+      const s = r.payment?.status || 'unpaid';
+      acc[s] = (acc[s] || 0) + 1;
+      return acc;
+    },
+    { paid: 0, partial: 0, unpaid: 0 }
+  );
+
+  const todayTotal = todayTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
 
   return (
     <div>
       <h2>الحسابات والاشتراكات</h2>
 
-      <div className="card row">
-        <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-          {ARABIC_MONTHS.map((m, i) => (
-            <option key={i} value={i + 1}>{m}</option>
-          ))}
-        </select>
-        <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
-          {[year - 1, year, year + 1].map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
-        <div className="muted" style={{ marginRight: 'auto' }}>
-          المستحق: {totalDue} | المحصّل: {totalPaid}
+      <div className="card">
+        <div className="row">
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+            {ARABIC_MONTHS.map((m, i) => (
+              <option key={i} value={i + 1}>{m}</option>
+            ))}
+          </select>
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
+            {[year - 1, year, year + 1].map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
         </div>
+
+        <div className="stat-grid" style={{ marginTop: 12 }}>
+          <div className="stat-card stat-paid">
+            <div className="stat-value">{statusCounts.paid}</div>
+            <div className="stat-label">دافع</div>
+          </div>
+          <div className="stat-card stat-partial">
+            <div className="stat-value">{statusCounts.partial}</div>
+            <div className="stat-label">جزئي</div>
+          </div>
+          <div className="stat-card stat-unpaid">
+            <div className="stat-value">{statusCounts.unpaid}</div>
+            <div className="stat-label">لم يدفع</div>
+          </div>
+        </div>
+
+        <div className="muted" style={{ marginTop: 12, textAlign: 'center' }}>
+          إجمالي المستحق: {totalDue} | إجمالي المحصّل: {totalPaid}
+        </div>
+
+        <div style={{ marginTop: 10, textAlign: 'center' }}>
+          <Button variant="outline" size="sm" loading={exporting} onClick={exportPayments}>
+            تصدير تحصيل الشهر (CSV)
+          </Button>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="row-between">
+          <h3 style={{ margin: 0 }}>المحصّل اليوم</h3>
+          <strong style={{ color: '#16a34a' }}>{todayTotal.toFixed(0)} جنيه</strong>
+        </div>
+        <div className="muted" style={{ marginTop: 2 }}>لجرد الخزينة اليومي</div>
+
+        {loadingToday && <div style={{ marginTop: 10 }}><SkeletonCards count={2} /></div>}
+
+        {!loadingToday && todayTransactions.length === 0 && (
+          <div className="muted" style={{ marginTop: 10 }}>لسه محصّلتش أي مبلغ النهاردة.</div>
+        )}
+
+        {!loadingToday && todayTransactions.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            {todayTransactions.map((t) => (
+              <div key={t.id} className="row-between" style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                <span>{t.students?.name || '—'}</span>
+                <span className="row" style={{ gap: 10 }}>
+                  <span className="muted">
+                    {new Date(t.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <strong style={{ color: t.amount >= 0 ? '#16a34a' : '#dc2626' }}>
+                    {t.amount >= 0 ? '+' : ''}{t.amount}
+                  </strong>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <input
@@ -129,11 +258,16 @@ export default function AccountsPage() {
         style={{ width: '100%', marginBottom: 10 }}
       />
 
-      {loading && <div className="muted">جارِ التحميل...</div>}
+      {loading && <SkeletonCards count={4} />}
+
+      {!loading && filtered.length === 0 && (
+        <EmptyState title="لا يوجد طلاب مطابقين" />
+      )}
 
       {!loading && filtered.map((row) => {
         const p = row.payment;
         const status = p?.status || 'unpaid';
+        const hasPhone = !!row.student.parent_phone;
         return (
           <div key={row.student.id} className="card">
             <div className="row-between">
@@ -142,7 +276,7 @@ export default function AccountsPage() {
                 <strong>{row.student.name}</strong>
               </div>
               <div className="row">
-                {status !== 'paid' && (
+                {status !== 'paid' && hasPhone && (
                   <Button
                     as="a"
                     variant="whatsapp"

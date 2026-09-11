@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '../../../lib/supabaseClient';
 import Button from '../../../lib/Button';
+import { SkeletonCards } from '../../../lib/Skeleton';
+import EmptyState from '../../../lib/EmptyState';
 
 export default function StudentsPage() {
   const [students, setStudents] = useState([]);
@@ -34,6 +36,19 @@ export default function StudentsPage() {
     loadAll();
   }, []);
 
+  // سيريال تلقائي: رقم الطالب داخل نفس المجموعة (لا يمكن إدخاله يدوياً)
+  useEffect(() => {
+    const computeSerial = async () => {
+      if (editingId || !form.group_id) return;
+      const { data } = await supabase.from('students').select('student_number').eq('group_id', form.group_id);
+      const nums = (data || []).map((s) => parseInt(s.student_number, 10)).filter((n) => !isNaN(n));
+      const next = nums.length ? Math.max(...nums) + 1 : 1;
+      setForm((f) => ({ ...f, student_number: String(next) }));
+    };
+    computeSerial();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.group_id, editingId]);
+
   const groupsForGrade = (gradeId) => groups.filter((g) => g.grade_id === gradeId);
   const gradeName = (id) => grades.find((g) => g.id === id)?.name || '—';
   const groupName = (id) => groups.find((g) => g.id === id)?.name || '—';
@@ -49,7 +64,7 @@ export default function StudentsPage() {
     setSaving(true);
     const payload = {
       name: form.name.trim(),
-      student_number: form.student_number.trim() || null,
+      student_number: form.student_number || null,
       parent_phone: form.parent_phone.trim() || null,
       grade_id: form.grade_id || null,
       group_id: form.group_id || null,
@@ -87,8 +102,6 @@ export default function StudentsPage() {
       (s.student_number || '').toLowerCase().includes(search.toLowerCase())
   );
 
-  if (loading) return <div className="muted">جارِ التحميل...</div>;
-
   return (
     <div>
       <h2>الطلاب</h2>
@@ -103,9 +116,9 @@ export default function StudentsPage() {
             required
           />
           <input
-            placeholder="رقم الطالب"
-            value={form.student_number}
-            onChange={(e) => setForm({ ...form, student_number: e.target.value })}
+            placeholder="رقم الطالب (تلقائي)"
+            value={form.student_number ? `#${form.student_number}` : 'اختر المجموعة أولاً'}
+            disabled
             style={{ flex: 1 }}
           />
         </div>
@@ -153,20 +166,23 @@ export default function StudentsPage() {
         style={{ width: '100%', marginBottom: 10 }}
       />
 
-      {filtered.length === 0 && <div className="muted">لا يوجد طلاب مطابقين.</div>}
+      {loading && <SkeletonCards count={5} />}
 
-      {filtered.map((student) => (
+      {!loading && filtered.length === 0 && <EmptyState title="لا يوجد طلاب مطابقين" />}
+
+      {!loading && filtered.map((student) => (
         <div key={student.id} className="card row-between">
           <Link href={`/students/${student.id}`}>
-            <div style={{ fontWeight: 600 }}>{student.name}</div>
+            <div style={{ fontWeight: 600 }}>
+              {student.student_number ? `#${student.student_number} — ` : ''}{student.name}
+            </div>
             <div className="muted">
               {gradeName(student.grade_id)} / {groupName(student.group_id)}
-              {student.student_number ? ` — رقم: ${student.student_number}` : ''}
             </div>
           </Link>
           <div className="row">
-            <button className="btn btn-outline btn-sm" onClick={() => startEdit(student)}>تعديل</button>
-            <button className="btn btn-danger btn-sm" onClick={() => deleteStudent(student.id)}>حذف</button>
+            <Button variant="outline" size="sm" onClick={() => startEdit(student)}>تعديل</Button>
+            <Button variant="danger" size="sm" onClick={() => deleteStudent(student.id)}>حذف</Button>
           </div>
         </div>
       ))}

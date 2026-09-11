@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '../../lib/supabaseClient';
 import { IconWallet, IconCheckClipboard, IconUsers, IconBuilding, IconHome, IconLogout } from '../../lib/icons';
+import ThemeToggle from '../../lib/ThemeToggle';
 
 const NAV_ITEMS = [
   { href: '/accounts', Icon: IconWallet, label: 'الحسابات' },
@@ -46,16 +47,19 @@ export default function AppLayout({ children }) {
           <img src="/icons/logo-header.png" alt="حصتي" className="topbar-logo" />
           <span>حصتي</span>
         </div>
-        <button
-          className="btn2 btn2-outline btn2-sm"
-          style={{ background: 'transparent', color: 'white', borderColor: 'rgba(255,255,255,0.6)' }}
-          onClick={async () => {
-            await supabase.auth.signOut();
-            router.replace('/login');
-          }}
-        >
-          <IconLogout size={15} /> خروج
-        </button>
+        <div className="row">
+          <ThemeToggle />
+          <button
+            className="btn2 btn2-outline btn2-sm"
+            style={{ background: 'transparent', color: 'white', borderColor: 'rgba(255,255,255,0.6)' }}
+            onClick={async () => {
+              await supabase.auth.signOut();
+              router.replace('/login');
+            }}
+          >
+            <IconLogout size={15} /> خروج
+          </button>
+        </div>
       </div>
       <div className="page page-fade" key={pathname}>
         {children}

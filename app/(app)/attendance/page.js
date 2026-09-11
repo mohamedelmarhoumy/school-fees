@@ -6,6 +6,9 @@ import { supabase } from '../../../lib/supabaseClient';
 import { buildWhatsAppLink } from '../../../lib/whatsapp';
 import { ATTENDANCE_STATUS_LABELS } from '../../../lib/constants';
 import Button from '../../../lib/Button';
+import { SkeletonCards } from '../../../lib/Skeleton';
+import EmptyState from '../../../lib/EmptyState';
+import { downloadCsv } from '../../../lib/exportCsv';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -29,6 +32,7 @@ function AttendanceContent() {
   const [date, setDate] = useState(presetDate || todayStr());
   const [rows, setRows] = useState([]); // { student, record, unpaid }
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     const loadGradesGroups = async () => {
@@ -81,7 +85,6 @@ function AttendanceContent() {
       recordsByStudent[r.student_id] = r;
     });
 
-    // ensure session generated: أنشئ سجل "حاضر" لكل طالب في المجموعة ليس له سجل في هذا التاريخ
     const toInsert = (students || [])
       .filter((s) => !recordsByStudent[s.id])
       .map((s) => ({ student_id: s.id, group_id: groupId, date, status: 'present' }));
@@ -93,7 +96,6 @@ function AttendanceContent() {
       });
     }
 
-    // مؤشر المتأخرات المالية للشهر الحالي
     const now = new Date();
     const { data: payments } = await supabase
       .from('payments')
@@ -130,6 +132,21 @@ function AttendanceContent() {
     loadSession();
   };
 
+  const exportAttendance = async () => {
+    setExporting(true);
+    const { data: records } = await supabase
+      .from('attendance')
+      .select('*, students(name)')
+      .eq('date', date);
+    const csvRows = (records || []).map((r) => [r.students?.name || '', r.date, r.status]);
+    downloadCsv(`حضور-${date}.csv`, ['اسم الطالب', 'التاريخ', 'الحالة'], csvRows);
+    setExporting(false);
+  };
+
+  const presentCount = rows.filter((r) => (r.record?.status || 'present') === 'present').length;
+  const absentCount = rows.filter((r) => r.record?.status === 'absent').length;
+  const lateCount = rows.filter((r) => r.record?.status === 'late').length;
+
   return (
     <div>
       <h2>الحضور والغياب</h2>
@@ -151,16 +168,33 @@ function AttendanceContent() {
           <span>📅</span>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
+
+        {groupId && !loading && (
+          <div className="row-between" style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+            <span className="muted">
+              عدد الطلاب: <strong style={{ color: 'var(--text)' }}>{rows.length}</strong>
+              {rows.length > 0 && (
+                <> — حاضر {presentCount} / تأخير {lateCount} / غائب {absentCount}</>
+              )}
+            </span>
+            <Button variant="outline" size="sm" loading={exporting} onClick={exportAttendance}>
+              تصدير (CSV)
+            </Button>
+          </div>
+        )}
       </div>
 
-      {!groupId && <div className="muted">أضف صفاً ومجموعة أولاً من شاشة الصفوف.</div>}
-      {loading && <div className="muted">جارِ التحميل...</div>}
+      {!groupId && <EmptyState title="أضف صفاً ومجموعة أولاً" hint="من شاشة الصفوف." />}
+      {loading && <SkeletonCards count={4} />}
 
-      {!loading && groupId && rows.length === 0 && <div className="muted">لا يوجد طلاب في هذه المجموعة.</div>}
+      {!loading && groupId && rows.length === 0 && (
+        <EmptyState title="لا يوجد طلاب في هذه المجموعة" />
+      )}
 
       {!loading &&
         rows.map((row) => {
           const status = row.record?.status || 'present';
+          const hasPhone = !!row.student.parent_phone;
           return (
             <div key={row.student.id} className="card row-between">
               <div className="row">
@@ -168,7 +202,7 @@ function AttendanceContent() {
                 <span>{row.student.name}</span>
               </div>
               <div className="row">
-                {status === 'absent' && (
+                {status === 'absent' && hasPhone && (
                   <Button
                     as="a"
                     variant="whatsapp"
