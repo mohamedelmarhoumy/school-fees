@@ -14,6 +14,10 @@ create table if not exists groups_table (
   id uuid primary key default gen_random_uuid(),
   grade_id uuid not null references grades(id) on delete cascade,
   name text not null,
+  -- أيام الأسبوع كأرقام: 0=الأحد ... 6=السبت (نفس ترقيم JavaScript Date.getDay())
+  days_of_week smallint[] not null default '{}',
+  start_time time,
+  end_time time,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

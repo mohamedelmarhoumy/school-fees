@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import { buildWhatsAppLink } from '../../../lib/whatsapp';
 import { ATTENDANCE_STATUS_LABELS } from '../../../lib/constants';
@@ -8,11 +9,23 @@ import { ATTENDANCE_STATUS_LABELS } from '../../../lib/constants';
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
 export default function AttendancePage() {
+  return (
+    <Suspense fallback={<div className="muted">جارِ التحميل...</div>}>
+      <AttendanceContent />
+    </Suspense>
+  );
+}
+
+function AttendanceContent() {
+  const searchParams = useSearchParams();
+  const presetGroupId = searchParams.get('groupId');
+  const presetDate = searchParams.get('date');
+
   const [grades, setGrades] = useState([]);
   const [groups, setGroups] = useState([]);
   const [gradeId, setGradeId] = useState('');
   const [groupId, setGroupId] = useState('');
-  const [date, setDate] = useState(todayStr());
+  const [date, setDate] = useState(presetDate || todayStr());
   const [rows, setRows] = useState([]); // { student, record, unpaid }
   const [loading, setLoading] = useState(false);
 
@@ -22,6 +35,15 @@ export default function AttendancePage() {
       const { data: groupsData } = await supabase.from('groups_table').select('*').order('name');
       setGrades(gradesData || []);
       setGroups(groupsData || []);
+
+      if (presetGroupId) {
+        const presetGroup = (groupsData || []).find((g) => g.id === presetGroupId);
+        if (presetGroup) {
+          setGradeId(presetGroup.grade_id);
+          setGroupId(presetGroup.id);
+          return;
+        }
+      }
       if (gradesData && gradesData.length > 0 && !gradeId) setGradeId(gradesData[0].id);
     };
     loadGradesGroups();

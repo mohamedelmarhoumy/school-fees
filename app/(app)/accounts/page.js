@@ -71,8 +71,11 @@ export default function AccountsPage() {
 
   const startEdit = (row) => {
     setEditingStudentId(row.student.id);
-    setEditPaid(String(row.payment?.amount_paid ?? 0));
-    setEditDiscount(String(row.payment?.discount_amount ?? 0));
+    // اترك الحقل فاضي بدل ما نحط صفر، عشان المدرس ميحتاجش يمسحه كل مرة قبل الكتابة
+    const paid = row.payment?.amount_paid;
+    const discount = row.payment?.discount_amount;
+    setEditPaid(paid ? String(paid) : '');
+    setEditDiscount(discount ? String(discount) : '');
   };
 
   const savePayment = async (row) => {

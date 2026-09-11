@@ -1,16 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { supabase } from '../../../lib/supabaseClient';
 import { downloadCsv } from '../../../lib/exportCsv';
-import { ARABIC_MONTHS } from '../../../lib/constants';
+import { ARABIC_MONTHS, WEEKDAY_LABELS } from '../../../lib/constants';
 
 const now = new Date();
+const todayStr = () => new Date().toISOString().slice(0, 10);
 
 export default function DashboardPage() {
   const [year] = useState(now.getFullYear());
   const [month] = useState(now.getMonth() + 1);
   const [summary, setSummary] = useState({ paid: 0, partial: 0, unpaid: 0, totalDue: 0, totalPaid: 0 });
+  const [todaysGroups, setTodaysGroups] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,6 +27,14 @@ export default function DashboardPage() {
         counts.totalPaid += Number(p.amount_paid) + Number(p.discount_amount);
       });
       setSummary(counts);
+
+      const { data: groups } = await supabase.from('groups_table').select('*, grades(name)');
+      const todayWeekday = new Date().getDay();
+      const todays = (groups || [])
+        .filter((g) => (g.days_of_week || []).includes(todayWeekday))
+        .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
+      setTodaysGroups(todays);
+
       setLoading(false);
     };
     load();
@@ -67,6 +78,28 @@ export default function DashboardPage() {
         <div className="muted">جارِ التحميل...</div>
       ) : (
         <>
+          <div className="card">
+            <h3 style={{ marginTop: 0 }}>مجموعات اليوم ({WEEKDAY_LABELS[new Date().getDay()]})</h3>
+            {todaysGroups.length === 0 && (
+              <div className="muted">لا توجد مجموعات مجدولة اليوم.</div>
+            )}
+            {todaysGroups.map((g) => (
+              <Link
+                key={g.id}
+                href={`/attendance?groupId=${g.id}&date=${todayStr()}`}
+                className="row-between"
+                style={{ padding: '8px 0', borderBottom: '1px solid #f1f2f4' }}
+              >
+                <div>
+                  <strong>{g.grades?.name}</strong> — {g.name}
+                </div>
+                <span className="muted">
+                  {g.start_time ? `${g.start_time.slice(0, 5)} - ${g.end_time?.slice(0, 5) || ''}` : ''}
+                </span>
+              </Link>
+            ))}
+          </div>
+
           <div className="card">
             <h3 style={{ marginTop: 0 }}>{ARABIC_MONTHS[month - 1]} {year}</h3>
             <div className="row" style={{ justifyContent: 'space-evenly', textAlign: 'center' }}>
