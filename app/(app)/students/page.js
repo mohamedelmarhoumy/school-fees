@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '../../../lib/supabaseClient';
+import { scheduleLabel } from '../../../lib/schedule';
 import Button from '../../../lib/Button';
 import { SkeletonCards } from '../../../lib/Skeleton';
 import EmptyState from '../../../lib/EmptyState';
@@ -147,7 +148,9 @@ export default function StudentsPage() {
           >
             <option value="">اختر المجموعة</option>
             {groupsForGrade(form.grade_id).map((g) => (
-              <option key={g.id} value={g.id}>{g.name}</option>
+              <option key={g.id} value={g.id}>
+                {g.name}{scheduleLabel(g) ? ` — ${scheduleLabel(g)}` : ''}
+              </option>
             ))}
           </select>
         </div>

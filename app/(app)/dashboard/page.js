@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '../../../lib/supabaseClient';
 import { WEEKDAY_LABELS, ARABIC_MONTHS } from '../../../lib/constants';
+import { formatTime12h } from '../../../lib/schedule';
 import { SkeletonCards } from '../../../lib/Skeleton';
 import EmptyState from '../../../lib/EmptyState';
 
@@ -17,9 +18,13 @@ export default function DashboardPage() {
     const load = async () => {
       setLoading(true);
       const { data: groups } = await supabase.from('groups_table').select('*, grades(name)');
-      const todayWeekday = new Date().getDay();
+      const today = new Date();
+      const todayWeekday = today.getDay();
+      const nowTimeStr = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}:00`;
       const todays = (groups || [])
         .filter((g) => (g.days_of_week || []).includes(todayWeekday))
+        // اشيل المجموعة اللي فات معادها (وقت انتهائها قبل الوقت الحالي)
+        .filter((g) => !g.end_time || g.end_time >= nowTimeStr)
         .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
       setTodaysGroups(todays);
       setLoading(false);
@@ -39,7 +44,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>مجموعات اليوم</h3>
+        <h3 style={{ marginTop: 0 }}>مجموعات اليوم ({todaysGroups.length})</h3>
 
         {loading && <SkeletonCards count={3} />}
 
@@ -59,7 +64,7 @@ export default function DashboardPage() {
                 <strong>{g.grades?.name}</strong> — {g.name}
               </div>
               <span className="muted">
-                {g.start_time ? `${g.start_time.slice(0, 5)} - ${g.end_time?.slice(0, 5) || ''}` : ''}
+                {g.start_time ? `${formatTime12h(g.start_time)}${g.end_time ? ' - ' + formatTime12h(g.end_time) : ''}` : ''}
               </span>
             </Link>
           ))}

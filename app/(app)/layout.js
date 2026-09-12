@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '../../lib/supabaseClient';
-import { IconWallet, IconCheckClipboard, IconUsers, IconBuilding, IconHome, IconLogout } from '../../lib/icons';
+import { IconWallet, IconCheckClipboard, IconUsers, IconBuilding, IconHome, IconLogout, IconSearch } from '../../lib/icons';
 import ThemeToggle from '../../lib/ThemeToggle';
+import SearchOverlay from '../../lib/SearchOverlay';
+import { useOverdueNotifications, OverdueBell, OverdueToast } from '../../lib/Notifications';
 
 const NAV_ITEMS = [
   { href: '/accounts', Icon: IconWallet, label: 'الحسابات' },
@@ -19,6 +21,8 @@ export default function AppLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const [checked, setChecked] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const { count: overdueCount, toastVisible, dismissToast } = useOverdueNotifications();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -47,27 +51,36 @@ export default function AppLayout({ children }) {
           <img src="/icons/logo-header.png" alt="حصتي" className="topbar-logo" />
           <span>حصتي</span>
         </div>
-        <div className="row">
+        <div className="row" style={{ gap: 4 }}>
+          <button className="icon-btn" onClick={() => setSearchOpen(true)} title="بحث">
+            <IconSearch size={17} />
+          </button>
+          <OverdueBell count={overdueCount} />
           <ThemeToggle />
           <button
-            className="btn2 btn2-outline btn2-sm"
-            style={{ background: 'transparent', color: 'white', borderColor: 'rgba(255,255,255,0.6)' }}
+            className="icon-btn"
+            title="خروج"
             onClick={async () => {
               await supabase.auth.signOut();
               router.replace('/login');
             }}
           >
-            <IconLogout size={15} /> خروج
+            <IconLogout size={16} />
           </button>
         </div>
       </div>
+
+      <OverdueToast visible={toastVisible} count={overdueCount} onDismiss={dismissToast} />
+
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
+
       <div className="page page-fade" key={pathname}>
         {children}
       </div>
       <nav className="bottom-nav">
         {NAV_ITEMS.map(({ href, Icon, label }) => (
           <Link key={href} href={href} className={pathname === href ? 'active' : ''}>
-            <span className="nav-icon"><Icon size={22} /></span>
+            <span className="nav-icon-circle"><Icon size={20} /></span>
             {label}
           </Link>
         ))}

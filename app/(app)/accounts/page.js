@@ -160,7 +160,9 @@ export default function AccountsPage() {
     setExporting(false);
   };
 
-  const filtered = rows.filter((r) => r.student.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = rows
+    .filter((r) => (r.payment?.status || 'unpaid') !== 'paid')
+    .filter((r) => r.student.name.toLowerCase().includes(search.toLowerCase()));
 
   const totalDue = rows.reduce((sum, r) => sum + Number(r.payment?.amount_due || 0), 0);
   const totalPaid = rows.reduce((sum, r) => sum + Number(r.payment?.amount_paid || 0), 0);
@@ -255,13 +257,20 @@ export default function AccountsPage() {
         placeholder="بحث باسم الطالب..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        style={{ width: '100%', marginBottom: 10 }}
+        style={{ width: '100%', marginBottom: 4 }}
       />
+      <div className="muted" style={{ marginBottom: 10 }}>
+        (القائمة تعرض الطلاب اللي لسه عليهم متبقي فقط — لم يدفع أو دفع جزء)
+      </div>
 
       {loading && <SkeletonCards count={4} />}
 
-      {!loading && filtered.length === 0 && (
-        <EmptyState title="لا يوجد طلاب مطابقين" />
+      {!loading && filtered.length === 0 && rows.length > 0 && (
+        <EmptyState title="كل الطلاب دافعين هذا الشهر 🎉" />
+      )}
+
+      {!loading && rows.length === 0 && (
+        <EmptyState title="لا يوجد طلاب مسجّلين بعد" />
       )}
 
       {!loading && filtered.map((row) => {

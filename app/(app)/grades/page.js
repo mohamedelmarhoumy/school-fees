@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { WEEKDAY_LABELS } from '../../../lib/constants';
+import { scheduleLabel } from '../../../lib/schedule';
 import Button from '../../../lib/Button';
 
 const emptyGroupForm = { name: '', days: [], start_time: '', end_time: '' };
@@ -27,14 +28,6 @@ function DaysPicker({ selectedDays, onToggle }) {
       ))}
     </div>
   );
-}
-
-function scheduleLabel(group) {
-  const days = (group.days_of_week || []).slice().sort((a, b) => a - b);
-  if (days.length === 0 && !group.start_time) return null;
-  const dayNames = days.map((d) => WEEKDAY_LABELS[d]).join('، ');
-  const time = group.start_time && group.end_time ? `${group.start_time.slice(0, 5)} - ${group.end_time.slice(0, 5)}` : '';
-  return [dayNames, time].filter(Boolean).join(' | ');
 }
 
 export default function GradesPage() {
