@@ -9,6 +9,7 @@ import Button from '../../../lib/Button';
 import { SkeletonCards } from '../../../lib/Skeleton';
 import EmptyState from '../../../lib/EmptyState';
 import { downloadCsv } from '../../../lib/exportCsv';
+import SessionSummaryModal from '../../../lib/SessionSummaryModal';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -33,6 +34,7 @@ function AttendanceContent() {
   const [rows, setRows] = useState([]); // { student, record, unpaid }
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   useEffect(() => {
     const loadGradesGroups = async () => {
@@ -182,7 +184,26 @@ function AttendanceContent() {
             </Button>
           </div>
         )}
+
+        {groupId && !loading && rows.length > 0 && (
+          <Button
+            variant="primary"
+            size="sm"
+            style={{ marginTop: 10, width: '100%', justifyContent: 'center' }}
+            onClick={() => setSummaryOpen(true)}
+          >
+            📋 إعداد ملخص الحصة
+          </Button>
+        )}
       </div>
+
+      <SessionSummaryModal
+        open={summaryOpen}
+        onClose={() => setSummaryOpen(false)}
+        groupName={groupsForGrade.find((g) => g.id === groupId)?.name || ''}
+        dateLabel={date}
+        students={rows.map((r) => ({ id: r.student.id, name: r.student.name, parent_phone: r.student.parent_phone }))}
+      />
 
       {!groupId && <EmptyState title="أضف صفاً ومجموعة أولاً" hint="من شاشة الصفوف." />}
       {loading && <SkeletonCards count={4} />}
