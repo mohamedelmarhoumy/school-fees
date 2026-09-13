@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '../../lib/supabaseClient';
-import { IconWallet, IconCheckClipboard, IconUsers, IconBuilding, IconHome, IconLogout, IconSearch } from '../../lib/icons';
+import { IconWallet, IconCheckClipboard, IconUsers, IconBuilding, IconHome, IconLogout, IconSearch, IconUserCircle } from '../../lib/icons';
 import ThemeToggle from '../../lib/ThemeToggle';
 import SearchOverlay from '../../lib/SearchOverlay';
 import { useOverdueNotifications, OverdueBell, OverdueToast } from '../../lib/Notifications';
@@ -57,6 +57,9 @@ export default function AppLayout({ children }) {
           </button>
           <OverdueBell count={overdueCount} />
           <ThemeToggle />
+          <Link href="/account" className="icon-btn" title="إعدادات الحساب">
+            <IconUserCircle size={16} />
+          </Link>
           <button
             className="icon-btn"
             title="خروج"
