@@ -1,11 +1,8 @@
--- نفّذ هذا الملف كامل في: Supabase Dashboard -> SQL Editor -> New query -> Run
--- (هذا الملف لمشروع Supabase جديد بالكامل. لو عندك بيانات موجودة بالفعل،
---  استخدم ملفات supabase/migrations بالترتيب الرقمي بدلاً منه)
-
-create extension if not exists "pgcrypto";
+-- نفّذ هذا الملف في Supabase -> SQL Editor لو عندك مشروع قائم بالفعل
+-- (لازم يتشغّل بعد كل ملفات migrations السابقة: 002 و 003 و 004)
 
 -- ============================================================
--- 1) نظام الأدوار: owner (المدرس) و assistant (المساعد)
+-- 1) جدول الملفات الشخصية (profiles) — يحدد دور كل مستخدم وصلاحياته
 -- ============================================================
 create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -24,6 +21,9 @@ create table if not exists profiles (
 
 create index if not exists idx_profiles_owner on profiles (owner_id);
 
+-- ============================================================
+-- 2) دوال مساعدة (SECURITY DEFINER عشان تتفادى مشاكل الاستدعاء الذاتي في RLS)
+-- ============================================================
 create or replace function effective_teacher_id() returns uuid
 language sql stable security definer set search_path = public as $$
   select owner_id from profiles where id = auth.uid() and is_active;
@@ -50,7 +50,9 @@ language sql stable security definer set search_path = public as $$
   );
 $$;
 
--- ينشئ ملف تعريف "owner" تلقائياً لأي حساب مدرّس جديد وقت إنشائه من لوحة Supabase
+-- ============================================================
+-- 3) إنشاء ملف تعريف تلقائي لأي حساب مدرّس جديد (owner) وقت إنشائه
+-- ============================================================
 create or replace function handle_new_owner_profile() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
@@ -66,142 +68,80 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function handle_new_owner_profile();
 
--- ============================================================
--- 2) جداول التطبيق — teacher_id بياخد قيمته تلقائياً من effective_teacher_id()
---    (المدرس نفسه لو owner، أو المدرس التابع له لو assistant)
--- ============================================================
-create table if not exists grades (
-  id uuid primary key default gen_random_uuid(),
-  teacher_id uuid not null default effective_teacher_id() references auth.users(id) on delete cascade,
-  name text not null,
-  monthly_fee numeric not null default 0,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists groups_table (
-  id uuid primary key default gen_random_uuid(),
-  teacher_id uuid not null default effective_teacher_id() references auth.users(id) on delete cascade,
-  grade_id uuid not null references grades(id) on delete cascade,
-  name text not null,
-  -- أيام الأسبوع كأرقام: 0=الأحد ... 6=السبت (نفس ترقيم JavaScript Date.getDay())
-  days_of_week smallint[] not null default '{}',
-  start_time time,
-  end_time time,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists students (
-  id uuid primary key default gen_random_uuid(),
-  teacher_id uuid not null default effective_teacher_id() references auth.users(id) on delete cascade,
-  name text not null,
-  student_number text,
-  parent_phone text,
-  grade_id uuid references grades(id) on delete set null,
-  group_id uuid references groups_table(id) on delete set null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists payments (
-  id uuid primary key default gen_random_uuid(),
-  teacher_id uuid not null default effective_teacher_id() references auth.users(id) on delete cascade,
-  student_id uuid not null references students(id) on delete cascade,
-  year int not null,
-  month int not null,
-  amount_due numeric not null default 0,
-  amount_paid numeric not null default 0,
-  discount_amount numeric not null default 0,
-  status text not null default 'unpaid',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (student_id, year, month)
-);
-
-create table if not exists attendance (
-  id uuid primary key default gen_random_uuid(),
-  teacher_id uuid not null default effective_teacher_id() references auth.users(id) on delete cascade,
-  student_id uuid not null references students(id) on delete cascade,
-  group_id uuid not null references groups_table(id) on delete cascade,
-  date date not null,
-  status text not null default 'present',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (student_id, date)
-);
-
-create table if not exists payment_transactions (
-  id uuid primary key default gen_random_uuid(),
-  teacher_id uuid not null default effective_teacher_id() references auth.users(id) on delete cascade,
-  student_id uuid not null references students(id) on delete cascade,
-  payment_id uuid references payments(id) on delete set null,
-  amount numeric not null,
-  created_at timestamptz not null default now()
-);
-
-create index if not exists idx_students_group on students (group_id);
-create index if not exists idx_payments_month on payments (year, month);
-create index if not exists idx_attendance_group_date on attendance (group_id, date);
-create index if not exists idx_attendance_student on attendance (student_id);
-create index if not exists idx_grades_teacher on grades (teacher_id);
-create index if not exists idx_groups_teacher on groups_table (teacher_id);
-create index if not exists idx_students_teacher on students (teacher_id);
-create index if not exists idx_payments_teacher on payments (teacher_id);
-create index if not exists idx_attendance_teacher on attendance (teacher_id);
-create index if not exists idx_txn_teacher on payment_transactions (teacher_id);
+-- تعبئة أي حساب موجود بالفعل قبل التحديث ده (المدرسين الحاليين) كـ owner
+insert into profiles (id, owner_id, role, email, display_name)
+select id, id, 'owner', email, email from auth.users
+on conflict (id) do nothing;
 
 -- ============================================================
--- 3) الحماية (RLS) — profiles نفسه
+-- 4) حماية جدول profiles نفسه
 -- ============================================================
 alter table profiles enable row level security;
 
+drop policy if exists "select own profile" on profiles;
 create policy "select own profile" on profiles for select
   using (id = auth.uid());
 
+drop policy if exists "owner manage team" on profiles;
 create policy "owner manage team" on profiles for all
   using (owner_id = auth.uid() and is_owner())
   with check (owner_id = auth.uid() and is_owner());
 
 -- ============================================================
--- 4) الحماية (RLS) — جداول البيانات، بحسب الدور والصلاحيات
+-- 5) تحديث سياسات كل جدول بيانات: قراءة لأي عضو فريق نشط،
+--    وكتابة حسب الصلاحية المحددة (أو owner دايماً مسموح)
 -- ============================================================
-alter table grades enable row level security;
-alter table groups_table enable row level security;
-alter table students enable row level security;
-alter table payments enable row level security;
-alter table attendance enable row level security;
-alter table payment_transactions enable row level security;
 
--- الصفوف والمجموعات: owner بس يقدر يعدّل، والفريق كله يقرأ
+-- الصفوف والمجموعات: owner بس يقدر يعدّل (بيانات هيكلية للمدرسة)، والكل يقرأ
+drop policy if exists "owner full access" on grades;
 create policy "team read" on grades for select using (teacher_id = effective_teacher_id());
 create policy "owner write" on grades for insert with check (teacher_id = effective_teacher_id() and is_owner());
 create policy "owner update" on grades for update using (teacher_id = effective_teacher_id() and is_owner()) with check (teacher_id = effective_teacher_id() and is_owner());
 create policy "owner delete" on grades for delete using (teacher_id = effective_teacher_id() and is_owner());
 
+drop policy if exists "owner full access" on groups_table;
 create policy "team read" on groups_table for select using (teacher_id = effective_teacher_id());
 create policy "owner write" on groups_table for insert with check (teacher_id = effective_teacher_id() and is_owner());
 create policy "owner update" on groups_table for update using (teacher_id = effective_teacher_id() and is_owner()) with check (teacher_id = effective_teacher_id() and is_owner());
 create policy "owner delete" on groups_table for delete using (teacher_id = effective_teacher_id() and is_owner());
 
--- الطلاب: الفريق كله يقرأ، والكتابة تحتاج صلاحية can_students أو owner
+-- الطلاب: الكل يقرأ (محتاجينه للحضور/التحصيل)، والكتابة تحتاج صلاحية can_students أو owner
+drop policy if exists "owner full access" on students;
 create policy "team read" on students for select using (teacher_id = effective_teacher_id());
 create policy "students write" on students for insert with check (teacher_id = effective_teacher_id() and (is_owner() or has_perm('students')));
 create policy "students update" on students for update using (teacher_id = effective_teacher_id()) with check (teacher_id = effective_teacher_id() and (is_owner() or has_perm('students')));
 create policy "students delete" on students for delete using (teacher_id = effective_teacher_id() and (is_owner() or has_perm('students')));
 
--- الاشتراكات: القراءة/الكتابة تحتاج صلاحية can_payments أو owner
+-- الاشتراكات: القراءة والكتابة تحتاج صلاحية can_payments أو owner
+-- (ملحوظة: صلاحية can_payments لازم تشوف مبلغ الطالب المستحق عشان تقدر تحصّله —
+--  can_view_financials منفصلة وبتتحكم في الإجماليات/التقارير على مستوى الواجهة فقط)
+drop policy if exists "owner full access" on payments;
 create policy "payments read" on payments for select using (teacher_id = effective_teacher_id() and (is_owner() or has_perm('payments')));
 create policy "payments write" on payments for insert with check (teacher_id = effective_teacher_id() and (is_owner() or has_perm('payments')));
 create policy "payments update" on payments for update using (teacher_id = effective_teacher_id() and (is_owner() or has_perm('payments'))) with check (teacher_id = effective_teacher_id() and (is_owner() or has_perm('payments')));
 create policy "payments delete" on payments for delete using (teacher_id = effective_teacher_id() and is_owner());
 
--- سجل التحصيل اليومي: الكتابة تلقائية مع can_payments، لكن قراءته كـ"تقرير" تحتاج can_view_financials
+-- سجل التحصيل اليومي: الكتابة تلقائية عند تسجيل دفعة (تحتاج can_payments)،
+-- لكن القراءة (استعراض سجل الخزينة كتقرير) تحتاج can_view_financials تحديداً
+drop policy if exists "owner full access" on payment_transactions;
 create policy "txn read" on payment_transactions for select using (teacher_id = effective_teacher_id() and (is_owner() or has_perm('financials')));
 create policy "txn write" on payment_transactions for insert with check (teacher_id = effective_teacher_id() and (is_owner() or has_perm('payments')));
 
--- الحضور: القراءة/الكتابة تحتاج صلاحية can_attendance أو owner
+-- الحضور: القراءة والكتابة تحتاج صلاحية can_attendance أو owner
+drop policy if exists "owner full access" on attendance;
 create policy "attendance read" on attendance for select using (teacher_id = effective_teacher_id());
 create policy "attendance write" on attendance for insert with check (teacher_id = effective_teacher_id() and (is_owner() or has_perm('attendance')));
 create policy "attendance update" on attendance for update using (teacher_id = effective_teacher_id() and (is_owner() or has_perm('attendance'))) with check (teacher_id = effective_teacher_id() and (is_owner() or has_perm('attendance')));
 create policy "attendance delete" on attendance for delete using (teacher_id = effective_teacher_id() and is_owner());
+
+-- ============================================================
+-- 6) تصحيح مهم: لازم عمود teacher_id ياخد قيمته من effective_teacher_id()
+--    مش auth.uid() مباشرة — وإلا لو مساعد أضاف طالب، هيتسجل الطالب
+--    وكأنه "معلّم" جديد مستقل بدل ما يتسجل تحت المدرس الأصلي بتاعه
+-- ============================================================
+alter table grades alter column teacher_id set default effective_teacher_id();
+alter table groups_table alter column teacher_id set default effective_teacher_id();
+alter table students alter column teacher_id set default effective_teacher_id();
+alter table payments alter column teacher_id set default effective_teacher_id();
+alter table attendance alter column teacher_id set default effective_teacher_id();
+alter table payment_transactions alter column teacher_id set default effective_teacher_id();

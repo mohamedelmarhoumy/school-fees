@@ -10,6 +10,7 @@ import { SkeletonCards } from '../../../lib/Skeleton';
 import EmptyState from '../../../lib/EmptyState';
 import { downloadCsv } from '../../../lib/exportCsv';
 import SessionSummaryModal from '../../../lib/SessionSummaryModal';
+import { useProfile } from '../../../lib/useProfile';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -35,6 +36,7 @@ function AttendanceContent() {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const { profile, isOwner } = useProfile();
 
   useEffect(() => {
     const loadGradesGroups = async () => {
@@ -148,6 +150,10 @@ function AttendanceContent() {
   const presentCount = rows.filter((r) => (r.record?.status || 'present') === 'present').length;
   const absentCount = rows.filter((r) => r.record?.status === 'absent').length;
   const lateCount = rows.filter((r) => r.record?.status === 'late').length;
+
+  if (!isOwner && !profile?.can_attendance) {
+    return <EmptyState title="غير مصرح لك بالدخول هنا" hint="مفيش صلاحية تسجيل الحضور على حسابك." />;
+  }
 
   return (
     <div>

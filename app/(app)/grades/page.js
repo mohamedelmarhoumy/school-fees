@@ -5,6 +5,8 @@ import { supabase } from '../../../lib/supabaseClient';
 import { WEEKDAY_LABELS } from '../../../lib/constants';
 import { scheduleLabel } from '../../../lib/schedule';
 import Button from '../../../lib/Button';
+import { useProfile } from '../../../lib/useProfile';
+import EmptyState from '../../../lib/EmptyState';
 
 const emptyGroupForm = { name: '', days: [], start_time: '', end_time: '' };
 
@@ -44,6 +46,7 @@ export default function GradesPage() {
   const [editGroupForm, setEditGroupForm] = useState(emptyGroupForm);
   const [addingGrade, setAddingGrade] = useState(false);
   const [addingGroupFor, setAddingGroupFor] = useState(null);
+  const { loading: profileLoading, isOwner } = useProfile();
 
   const loadAll = async () => {
     setLoading(true);
@@ -156,6 +159,11 @@ export default function GradesPage() {
     await supabase.from('groups_table').delete().eq('id', id);
     loadAll();
   };
+
+  if (profileLoading) return <div className="muted">جارِ التحميل...</div>;
+  if (!isOwner) {
+    return <EmptyState title="غير مصرح لك بالدخول هنا" hint="إدارة الصفوف والمجموعات للمدرس (صاحب الحساب) بس." />;
+  }
 
   if (loading) return <div className="muted">جارِ التحميل...</div>;
 

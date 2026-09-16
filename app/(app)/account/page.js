@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { supabase } from '../../../lib/supabaseClient';
 import Button from '../../../lib/Button';
+import { useProfile } from '../../../lib/useProfile';
 
 export default function AccountPage() {
+  const { isOwner } = useProfile();
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -59,6 +62,13 @@ export default function AccountPage() {
         <div className="muted">البريد الإلكتروني</div>
         <div style={{ fontWeight: 600, marginTop: 2 }}>{email || '—'}</div>
       </div>
+
+      {isOwner && (
+        <Link href="/assistants" className="card row-between" style={{ display: 'flex' }}>
+          <span>👥 إدارة المساعدين</span>
+          <span className="muted">←</span>
+        </Link>
+      )}
 
       <form onSubmit={handleSubmit} className="card">
         <h3 style={{ marginTop: 0 }}>تغيير كلمة المرور</h3>

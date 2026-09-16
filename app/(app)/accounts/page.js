@@ -8,6 +8,7 @@ import Button from '../../../lib/Button';
 import { SkeletonCards } from '../../../lib/Skeleton';
 import EmptyState from '../../../lib/EmptyState';
 import { downloadCsv } from '../../../lib/exportCsv';
+import { useProfile } from '../../../lib/useProfile';
 
 const now = new Date();
 
@@ -32,6 +33,8 @@ export default function AccountsPage() {
   const [exporting, setExporting] = useState(false);
   const [todayTransactions, setTodayTransactions] = useState([]);
   const [loadingToday, setLoadingToday] = useState(true);
+  const { profile, isOwner } = useProfile();
+  const canViewFinancials = isOwner || !!profile?.can_view_financials;
 
   const computeStatus = (due, paid, discount) => {
     const covered = Number(paid) + Number(discount);
@@ -177,6 +180,10 @@ export default function AccountsPage() {
 
   const todayTotal = todayTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
 
+  if (!isOwner && !profile?.can_payments) {
+    return <EmptyState title="غير مصرح لك بالدخول هنا" hint="مفيش صلاحية تحصيل الاشتراكات على حسابك." />;
+  }
+
   return (
     <div>
       <h2>الحسابات والاشتراكات</h2>
@@ -195,6 +202,8 @@ export default function AccountsPage() {
           </select>
         </div>
 
+        {canViewFinancials && (
+        <>
         <div className="stat-grid" style={{ marginTop: 12 }}>
           <div className="stat-card stat-paid">
             <div className="stat-value">{statusCounts.paid}</div>
@@ -219,8 +228,11 @@ export default function AccountsPage() {
             تصدير تحصيل الشهر (CSV)
           </Button>
         </div>
+        </>
+        )}
       </div>
 
+      {canViewFinancials && (
       <div className="card">
         <div className="row-between">
           <h3 style={{ margin: 0 }}>المحصّل اليوم</h3>
@@ -252,6 +264,7 @@ export default function AccountsPage() {
           </div>
         )}
       </div>
+      )}
 
       <input
         placeholder="بحث باسم الطالب..."

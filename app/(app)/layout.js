@@ -8,13 +8,14 @@ import { IconWallet, IconCheckClipboard, IconUsers, IconBuilding, IconHome, Icon
 import ThemeToggle from '../../lib/ThemeToggle';
 import SearchOverlay from '../../lib/SearchOverlay';
 import { useOverdueNotifications, OverdueBell, OverdueToast } from '../../lib/Notifications';
+import { useProfile } from '../../lib/useProfile';
 
-const NAV_ITEMS = [
-  { href: '/accounts', Icon: IconWallet, label: 'الحسابات' },
-  { href: '/attendance', Icon: IconCheckClipboard, label: 'الحضور' },
-  { href: '/students', Icon: IconUsers, label: 'الطلاب' },
-  { href: '/grades', Icon: IconBuilding, label: 'الصفوف' },
-  { href: '/dashboard', Icon: IconHome, label: 'الرئيسية' },
+const ALL_NAV_ITEMS = [
+  { href: '/accounts', Icon: IconWallet, label: 'الحسابات', show: (p) => p.isOwner || p.profile?.can_payments },
+  { href: '/attendance', Icon: IconCheckClipboard, label: 'الحضور', show: (p) => p.isOwner || p.profile?.can_attendance },
+  { href: '/students', Icon: IconUsers, label: 'الطلاب', show: (p) => p.isOwner || p.profile?.can_attendance || p.profile?.can_payments || p.profile?.can_students },
+  { href: '/grades', Icon: IconBuilding, label: 'الصفوف', show: (p) => p.isOwner },
+  { href: '/dashboard', Icon: IconHome, label: 'الرئيسية', show: () => true },
 ];
 
 export default function AppLayout({ children }) {
@@ -23,6 +24,8 @@ export default function AppLayout({ children }) {
   const [checked, setChecked] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const { count: overdueCount, toastVisible, dismissToast } = useOverdueNotifications();
+  const profileState = useProfile();
+  const navItems = ALL_NAV_ITEMS.filter((item) => item.show(profileState));
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -81,7 +84,7 @@ export default function AppLayout({ children }) {
         {children}
       </div>
       <nav className="bottom-nav">
-        {NAV_ITEMS.map(({ href, Icon, label }) => (
+        {navItems.map(({ href, Icon, label }) => (
           <Link key={href} href={href} className={pathname === href ? 'active' : ''}>
             <span className="nav-icon-circle"><Icon size={20} /></span>
             {label}

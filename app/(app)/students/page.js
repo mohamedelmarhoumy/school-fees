@@ -7,6 +7,7 @@ import { scheduleLabel } from '../../../lib/schedule';
 import Button from '../../../lib/Button';
 import { SkeletonCards } from '../../../lib/Skeleton';
 import EmptyState from '../../../lib/EmptyState';
+import { useProfile } from '../../../lib/useProfile';
 
 export default function StudentsPage() {
   const [students, setStudents] = useState([]);
@@ -19,6 +20,8 @@ export default function StudentsPage() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const { profile, isOwner } = useProfile();
+  const canEdit = isOwner || !!profile?.can_students;
 
   const loadAll = async () => {
     setLoading(true);
@@ -107,6 +110,7 @@ export default function StudentsPage() {
     <div>
       <h2>الطلاب</h2>
 
+      {canEdit && (
       <form onSubmit={handleSubmit} className="card">
         <div className="row">
           <input
@@ -161,6 +165,7 @@ export default function StudentsPage() {
           )}
         </div>
       </form>
+      )}
 
       <input
         placeholder="بحث بالاسم أو رقم الطالب..."
@@ -184,8 +189,12 @@ export default function StudentsPage() {
             </div>
           </Link>
           <div className="row">
-            <Button variant="outline" size="sm" onClick={() => startEdit(student)}>تعديل</Button>
-            <Button variant="danger" size="sm" onClick={() => deleteStudent(student.id)}>حذف</Button>
+            {canEdit && (
+              <>
+                <Button variant="outline" size="sm" onClick={() => startEdit(student)}>تعديل</Button>
+                <Button variant="danger" size="sm" onClick={() => deleteStudent(student.id)}>حذف</Button>
+              </>
+            )}
           </div>
         </div>
       ))}
