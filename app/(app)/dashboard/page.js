@@ -44,7 +44,10 @@ export default function DashboardPage() {
       </div>
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>مجموعات اليوم ({todaysGroups.length})</h3>
+        <div className="row-between">
+          <h3 style={{ marginTop: 0 }}>مجموعات اليوم ({todaysGroups.length})</h3>
+          <Link href="/schedule" className="muted" style={{ fontSize: 12.5 }}>الجدول الأسبوعي ←</Link>
+        </div>
 
         {loading && <SkeletonCards count={3} />}
 

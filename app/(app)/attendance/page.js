@@ -12,6 +12,7 @@ import { downloadCsv } from '../../../lib/exportCsv';
 import SessionSummaryModal from '../../../lib/SessionSummaryModal';
 import { useProfile } from '../../../lib/useProfile';
 import { logActivity } from '../../../lib/activityLog';
+import { printReport } from '../../../lib/printReport';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -153,6 +154,18 @@ function AttendanceContent() {
     setExporting(false);
   };
 
+  const exportAttendancePdf = () => {
+    const groupName = groupsForGrade.find((g) => g.id === groupId)?.name || '';
+    const pdfRows = rows.map((r) => [r.student.name, ATTENDANCE_STATUS_LABELS[r.record?.status || 'present']]);
+    printReport({
+      title: `كشف حضور — ${groupName}`,
+      subtitle: `حصتي — التاريخ: ${date}`,
+      columns: ['اسم الطالب', 'الحالة'],
+      rows: pdfRows,
+      totalsLine: `عدد الطلاب: ${rows.length} — حاضر ${presentCount} / تأخير ${lateCount} / غائب ${absentCount}`,
+    });
+  };
+
   const presentCount = rows.filter((r) => (r.record?.status || 'present') === 'present').length;
   const absentCount = rows.filter((r) => r.record?.status === 'absent').length;
   const lateCount = rows.filter((r) => r.record?.status === 'late').length;
@@ -191,9 +204,14 @@ function AttendanceContent() {
                 <> — حاضر {presentCount} / تأخير {lateCount} / غائب {absentCount}</>
               )}
             </span>
-            <Button variant="outline" size="sm" loading={exporting} onClick={exportAttendance}>
-              تصدير (CSV)
-            </Button>
+            <div className="row">
+              <Button variant="outline" size="sm" loading={exporting} onClick={exportAttendance}>
+                تصدير (CSV)
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportAttendancePdf}>
+                طباعة / PDF
+              </Button>
+            </div>
           </div>
         )}
 

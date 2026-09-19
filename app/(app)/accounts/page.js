@@ -11,6 +11,7 @@ import { downloadCsv } from '../../../lib/exportCsv';
 import { useProfile } from '../../../lib/useProfile';
 import { logActivity } from '../../../lib/activityLog';
 import TrendChart from '../../../lib/TrendChart';
+import { printReport } from '../../../lib/printReport';
 
 const now = new Date();
 
@@ -33,6 +34,7 @@ export default function AccountsPage() {
   const [editDiscount, setEditDiscount] = useState('');
   const [savingPayment, setSavingPayment] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [todayTransactions, setTodayTransactions] = useState([]);
   const [loadingToday, setLoadingToday] = useState(true);
   const [trendData, setTrendData] = useState([]);
@@ -179,6 +181,36 @@ export default function AccountsPage() {
     setSavingPayment(false);
   };
 
+  const exportPdf = async () => {
+    setExportingPdf(true);
+    const { data: payments } = await supabase
+      .from('payments')
+      .select('*, students(name)')
+      .eq('year', year)
+      .eq('month', month)
+      .order('students(name)');
+
+    const statusLabel = { paid: 'دافع', partial: 'جزئي', unpaid: 'لم يدفع' };
+    const pdfRows = (payments || []).map((p) => [
+      p.students?.name || '',
+      p.amount_due,
+      p.amount_paid,
+      p.discount_amount,
+      statusLabel[p.status] || p.status,
+    ]);
+    const totalDueMonth = (payments || []).reduce((s, p) => s + Number(p.amount_due), 0);
+    const totalPaidMonth = (payments || []).reduce((s, p) => s + Number(p.amount_paid) + Number(p.discount_amount), 0);
+
+    printReport({
+      title: `تقرير تحصيل ${ARABIC_MONTHS[month - 1]} ${year}`,
+      subtitle: `حصتي — تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG')}`,
+      columns: ['اسم الطالب', 'المستحق', 'المدفوع', 'الخصم', 'الحالة'],
+      rows: pdfRows,
+      totalsLine: `إجمالي المستحق: ${totalDueMonth} جنيه — إجمالي المحصّل: ${totalPaidMonth} جنيه`,
+    });
+    setExportingPdf(false);
+  };
+
   const exportPayments = async () => {
     setExporting(true);
     const { data: payments } = await supabase
@@ -261,9 +293,12 @@ export default function AccountsPage() {
           إجمالي المستحق: {totalDue} | إجمالي المحصّل: {totalPaid}
         </div>
 
-        <div style={{ marginTop: 10, textAlign: 'center' }}>
+        <div className="row" style={{ marginTop: 10, justifyContent: 'center' }}>
           <Button variant="outline" size="sm" loading={exporting} onClick={exportPayments}>
             تصدير تحصيل الشهر (CSV)
+          </Button>
+          <Button variant="outline" size="sm" loading={exportingPdf} onClick={exportPdf}>
+            طباعة / PDF
           </Button>
         </div>
         </>
