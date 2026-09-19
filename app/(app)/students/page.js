@@ -365,8 +365,8 @@ export default function StudentsPage() {
           <div className="row">
             {canEdit && (
               <>
-                <Button variant="outline" size="sm" onClick={() => startEdit(student)}>تعديل</Button>
-                <Button variant="danger" size="sm" onClick={() => deleteStudent(student.id, student.name)}>حذف</Button>
+                <Button variant="outline" size="sm" title="تعديل" onClick={() => startEdit(student)}>✏️</Button>
+                <Button variant="danger" size="sm" title="حذف" onClick={() => deleteStudent(student.id, student.name)}>🗑️</Button>
               </>
             )}
           </div>

@@ -35,7 +35,15 @@ export default function SchedulePage() {
     load();
   }, []);
 
-  const orderedDays = [0, 1, 2, 3, 4, 5, 6];
+  // الأسبوع عندنا يبدأ بالسبت وينتهي بالجمعة. وعشان يبقى عملي أكتر،
+  // العرض بيبدأ بالنهاردة أولاً وبعدين باقي الأيام بالترتيب بعده، لحد ما
+  // يلف على نفس ترتيب الأسبوع (سبت -> جمعة).
+  const SATURDAY_FIRST_WEEK = [6, 0, 1, 2, 3, 4, 5];
+  const todayIndexInWeek = SATURDAY_FIRST_WEEK.indexOf(today);
+  const orderedDays = [
+    ...SATURDAY_FIRST_WEEK.slice(todayIndexInWeek),
+    ...SATURDAY_FIRST_WEEK.slice(0, todayIndexInWeek),
+  ];
   const hasAny = Object.keys(byDay).length > 0;
 
   return (

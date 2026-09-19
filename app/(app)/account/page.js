@@ -8,8 +8,12 @@ import { useProfile } from '../../../lib/useProfile';
 import { downloadJson } from '../../../lib/exportJson';
 
 export default function AccountPage() {
-  const { isOwner } = useProfile();
+  const { profile, isOwner } = useProfile();
   const [email, setEmail] = useState('');
+  const [teacherName, setTeacherName] = useState('');
+  const [subjectName, setSubjectName] = useState('');
+  const [savingIdentity, setSavingIdentity] = useState(false);
+  const [identityToast, setIdentityToast] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -22,6 +26,30 @@ export default function AccountPage() {
       setEmail(data?.user?.email || '');
     });
   }, []);
+
+  useEffect(() => {
+    if (profile) {
+      setTeacherName(profile.display_name || '');
+      setSubjectName(profile.subject_name || '');
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    if (!identityToast) return;
+    const t = setTimeout(() => setIdentityToast(false), 3000);
+    return () => clearTimeout(t);
+  }, [identityToast]);
+
+  const handleSaveIdentity = async (e) => {
+    e.preventDefault();
+    setSavingIdentity(true);
+    await supabase
+      .from('profiles')
+      .update({ display_name: teacherName.trim() || null, subject_name: subjectName.trim() || null })
+      .eq('id', profile.id);
+    setSavingIdentity(false);
+    setIdentityToast(true);
+  };
 
   useEffect(() => {
     if (!successToast) return;
@@ -89,6 +117,25 @@ export default function AccountPage() {
       </div>
 
       {isOwner && (
+        <form onSubmit={handleSaveIdentity} className="card">
+          <h3 style={{ marginTop: 0 }}>بيانات المدرّس</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <input
+              placeholder="اسم المدرّس"
+              value={teacherName}
+              onChange={(e) => setTeacherName(e.target.value)}
+            />
+            <input
+              placeholder="اسم المادة"
+              value={subjectName}
+              onChange={(e) => setSubjectName(e.target.value)}
+            />
+            <Button type="submit" size="sm" loading={savingIdentity}>حفظ</Button>
+          </div>
+        </form>
+      )}
+
+      {isOwner && (
         <Link href="/assistants" className="card row-between" style={{ display: 'flex' }}>
           <span>👥 إدارة المساعدين</span>
           <span className="muted">←</span>
@@ -140,6 +187,9 @@ export default function AccountPage() {
 
       {successToast && (
         <div className="success-toast">✓ تم تحديث كلمة المرور بنجاح</div>
+      )}
+      {identityToast && (
+        <div className="success-toast">✓ تم حفظ بيانات المدرّس</div>
       )}
     </div>
   );

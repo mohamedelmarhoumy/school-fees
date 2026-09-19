@@ -268,15 +268,16 @@ export default function GradesPage() {
                 <div className="row">
                   <button
                     className="btn btn-outline btn-sm"
+                    title="تعديل"
                     onClick={() => {
                       setEditingGradeId(grade.id);
                       setEditGradeName(grade.name);
                       setEditGradeFee(String(grade.monthly_fee));
                     }}
                   >
-                    تعديل
+                    ✏️
                   </button>
-                  <button className="btn btn-danger btn-sm" onClick={() => deleteGrade(grade.id)}>حذف</button>
+                  <button className="btn btn-danger btn-sm" title="حذف" onClick={() => deleteGrade(grade.id)}>🗑️</button>
                 </div>
               </div>
             )}
@@ -332,8 +333,8 @@ export default function GradesPage() {
                         )}
                       </div>
                       <div className="row">
-                        <button className="btn btn-outline btn-sm" onClick={() => startEditGroup(group)}>تعديل</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => deleteGroup(group.id)}>حذف</button>
+                        <button className="btn btn-outline btn-sm" title="تعديل" onClick={() => startEditGroup(group)}>✏️</button>
+                        <button className="btn btn-danger btn-sm" title="حذف" onClick={() => deleteGroup(group.id)}>🗑️</button>
                       </div>
                     </div>
                   )}

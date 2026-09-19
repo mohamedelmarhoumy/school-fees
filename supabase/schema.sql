@@ -18,6 +18,7 @@ create table if not exists profiles (
   can_payments boolean not null default true,
   can_students boolean not null default true,
   can_view_financials boolean not null default true,
+  subject_name text,
   is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
@@ -162,6 +163,11 @@ create policy "select own profile" on profiles for select
 create policy "owner manage team" on profiles for all
   using (owner_id = auth.uid() and is_owner())
   with check (owner_id = auth.uid() and is_owner());
+
+-- يسمح لأي عضو فريق (owner أو assistant) يقرا اسم واسم مادة المدرس التابع له
+-- عشان يظهر في أعلى الشاشة
+create policy "team read owner profile" on profiles for select
+  using (id = effective_teacher_id());
 
 -- ============================================================
 -- 4) الحماية (RLS) — جداول البيانات، بحسب الدور والصلاحيات

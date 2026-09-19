@@ -9,6 +9,7 @@ import ThemeToggle from '../../lib/ThemeToggle';
 import SearchOverlay from '../../lib/SearchOverlay';
 import { useOverdueNotifications, OverdueBell, OverdueToast } from '../../lib/Notifications';
 import { useProfile } from '../../lib/useProfile';
+import ProfileProvider from '../../lib/ProfileProvider';
 
 const ALL_NAV_ITEMS = [
   { href: '/accounts', Icon: IconWallet, label: 'الحسابات', show: (p) => p.isOwner || p.profile?.can_payments },
@@ -20,12 +21,7 @@ const ALL_NAV_ITEMS = [
 
 export default function AppLayout({ children }) {
   const router = useRouter();
-  const pathname = usePathname();
   const [checked, setChecked] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const { count: overdueCount, toastVisible, dismissToast } = useOverdueNotifications();
-  const profileState = useProfile();
-  const navItems = ALL_NAV_ITEMS.filter((item) => item.show(profileState));
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -47,12 +43,53 @@ export default function AppLayout({ children }) {
     return <div className="center-screen">جارِ التحميل...</div>;
   }
 
+  // الـ ProfileProvider بيجيب بيانات المستخدم مرة واحدة بس وتفضل متاحة لكل
+  // الشاشات من غير ما كل شاشة تعمل طلب شبكة منفصل لوحدها عند كل تنقل —
+  // ده اللي كان بيسبب ظهور "غير مصرح لك" بشكل خاطف قبل كده.
+  return (
+    <ProfileProvider>
+      <AppShell>{children}</AppShell>
+    </ProfileProvider>
+  );
+}
+
+function AppShell({ children }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const { count: overdueCount, toastVisible, dismissToast } = useOverdueNotifications();
+  const profileState = useProfile();
+  const navItems = ALL_NAV_ITEMS.filter((item) => item.show(profileState));
+  const [teacherIdentity, setTeacherIdentity] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    supabase
+      .from('profiles')
+      .select('display_name, subject_name')
+      .eq('role', 'owner')
+      .single()
+      .then(({ data }) => {
+        if (active) setTeacherIdentity(data || null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div>
       <div className="topbar row-between">
         <div className="topbar-brand">
           <img src="/icons/logo-header.png" alt="حصتي" className="topbar-logo" />
-          <span>حصتي</span>
+          <div>
+            <div style={{ fontWeight: 700, lineHeight: 1.15 }}>
+              {teacherIdentity?.display_name || 'حصتي'}
+            </div>
+            {teacherIdentity?.subject_name && (
+              <div style={{ fontSize: 11.5, opacity: 0.8, fontWeight: 400 }}>{teacherIdentity.subject_name}</div>
+            )}
+          </div>
         </div>
         <div className="row" style={{ gap: 4 }}>
           <button className="icon-btn" onClick={() => setSearchOpen(true)} title="بحث">
