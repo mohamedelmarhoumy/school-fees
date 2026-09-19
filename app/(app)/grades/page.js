@@ -20,9 +20,9 @@ function DaysPicker({ selectedDays, onToggle }) {
           className="btn btn-sm"
           onClick={() => onToggle(index)}
           style={{
-            background: selectedDays.includes(index) ? '#2563eb' : 'white',
-            color: selectedDays.includes(index) ? 'white' : '#2563eb',
-            border: '1px solid #2563eb',
+            background: selectedDays.includes(index) ? 'var(--btn-primary-bg)' : 'var(--card-bg)',
+            color: selectedDays.includes(index) ? 'var(--btn-primary-text)' : 'var(--text)',
+            border: '1px solid var(--border)',
           }}
         >
           {label}
@@ -47,6 +47,8 @@ export default function GradesPage() {
   const [addingGrade, setAddingGrade] = useState(false);
   const [addingGroupFor, setAddingGroupFor] = useState(null);
   const { loading: profileLoading, isOwner } = useProfile();
+  const [groupStats, setGroupStats] = useState({});
+  const [loadingStats, setLoadingStats] = useState(true);
 
   const loadAll = async () => {
     setLoading(true);
@@ -64,7 +66,58 @@ export default function GradesPage() {
 
   useEffect(() => {
     loadAll();
+    loadStats();
   }, []);
+
+  const loadStats = async () => {
+    setLoadingStats(true);
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+
+    const [{ data: students }, { data: attendance }, { data: payments }] = await Promise.all([
+      supabase.from('students').select('id, group_id'),
+      supabase.from('attendance').select('group_id, status').gte('date', monthStart),
+      supabase.from('payments').select('student_id, status').eq('year', now.getFullYear()).eq('month', now.getMonth() + 1),
+    ]);
+
+    const studentsByGroup = {};
+    const groupByStudent = {};
+    (students || []).forEach((s) => {
+      if (!s.group_id) return;
+      studentsByGroup[s.group_id] = (studentsByGroup[s.group_id] || 0) + 1;
+      groupByStudent[s.id] = s.group_id;
+    });
+
+    const attendanceByGroup = {};
+    (attendance || []).forEach((a) => {
+      if (!attendanceByGroup[a.group_id]) attendanceByGroup[a.group_id] = { present: 0, total: 0 };
+      attendanceByGroup[a.group_id].total += 1;
+      if (a.status === 'present') attendanceByGroup[a.group_id].present += 1;
+    });
+
+    const paymentsByGroup = {};
+    (payments || []).forEach((p) => {
+      const gid = groupByStudent[p.student_id];
+      if (!gid) return;
+      if (!paymentsByGroup[gid]) paymentsByGroup[gid] = { paid: 0, total: 0 };
+      paymentsByGroup[gid].total += 1;
+      if (p.status === 'paid') paymentsByGroup[gid].paid += 1;
+    });
+
+    const stats = {};
+    Object.keys(studentsByGroup).forEach((gid) => {
+      const att = attendanceByGroup[gid];
+      const pay = paymentsByGroup[gid];
+      stats[gid] = {
+        studentCount: studentsByGroup[gid],
+        attendanceRate: att && att.total > 0 ? Math.round((att.present / att.total) * 100) : null,
+        paidCount: pay?.paid || 0,
+        paidTotal: pay?.total || 0,
+      };
+    });
+    setGroupStats(stats);
+    setLoadingStats(false);
+  };
 
   const addGrade = async (e) => {
     e.preventDefault();
@@ -265,6 +318,17 @@ export default function GradesPage() {
                         <span>{group.name}</span>
                         {scheduleLabel(group) && (
                           <div className="muted" style={{ fontSize: 12 }}>{scheduleLabel(group)}</div>
+                        )}
+                        {!loadingStats && groupStats[group.id] && (
+                          <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                            👥 {groupStats[group.id].studentCount} طالب
+                            {groupStats[group.id].attendanceRate !== null && (
+                              <> · 📊 حضور {groupStats[group.id].attendanceRate}%</>
+                            )}
+                            {groupStats[group.id].paidTotal > 0 && (
+                              <> · 💰 {groupStats[group.id].paidCount}/{groupStats[group.id].paidTotal} دافعين</>
+                            )}
+                          </div>
                         )}
                       </div>
                       <div className="row">

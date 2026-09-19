@@ -9,6 +9,8 @@ import { SkeletonCards } from '../../../lib/Skeleton';
 import EmptyState from '../../../lib/EmptyState';
 import { downloadCsv } from '../../../lib/exportCsv';
 import { useProfile } from '../../../lib/useProfile';
+import { logActivity } from '../../../lib/activityLog';
+import TrendChart from '../../../lib/TrendChart';
 
 const now = new Date();
 
@@ -33,6 +35,8 @@ export default function AccountsPage() {
   const [exporting, setExporting] = useState(false);
   const [todayTransactions, setTodayTransactions] = useState([]);
   const [loadingToday, setLoadingToday] = useState(true);
+  const [trendData, setTrendData] = useState([]);
+  const [loadingTrend, setLoadingTrend] = useState(true);
   const { profile, isOwner } = useProfile();
   const canViewFinancials = isOwner || !!profile?.can_view_financials;
 
@@ -100,8 +104,37 @@ export default function AccountsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, month]);
 
+  const loadTrend = async () => {
+    setLoadingTrend(true);
+    const months = [];
+    const cursor = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(cursor.getFullYear(), cursor.getMonth() - i, 1);
+      months.push({ year: d.getFullYear(), month: d.getMonth() + 1 });
+    }
+    const earliest = months[0];
+    const { data } = await supabase
+      .from('payments')
+      .select('year, month, amount_paid, discount_amount')
+      .gte('year', earliest.year);
+
+    const totalsByKey = {};
+    (data || []).forEach((p) => {
+      const key = `${p.year}-${p.month}`;
+      totalsByKey[key] = (totalsByKey[key] || 0) + Number(p.amount_paid) + Number(p.discount_amount);
+    });
+
+    const chartData = months.map((m) => ({
+      label: ARABIC_MONTHS[m.month - 1].slice(0, 3),
+      value: Math.round(totalsByKey[`${m.year}-${m.month}`] || 0),
+    }));
+    setTrendData(chartData);
+    setLoadingTrend(false);
+  };
+
   useEffect(() => {
     loadTodayTransactions();
+    loadTrend();
   }, []);
 
   const startEdit = (row) => {
@@ -133,6 +166,11 @@ export default function AccountsPage() {
         payment_id: row.payment.id,
         amount: delta,
       });
+      logActivity(
+        profile?.display_name || profile?.email,
+        'payment',
+        `${row.student.name} — ${delta > 0 ? `حصّل ${delta}` : `تعديل ${delta}`} جنيه (${ARABIC_MONTHS[month - 1]} ${year})`
+      );
     }
 
     setEditingStudentId(null);
@@ -231,6 +269,17 @@ export default function AccountsPage() {
         </>
         )}
       </div>
+
+      {canViewFinancials && (
+        <div className="card">
+          <h3 style={{ marginTop: 0 }}>اتجاه التحصيل (آخر 6 شهور)</h3>
+          {loadingTrend ? (
+            <div className="muted">جارِ التحميل...</div>
+          ) : (
+            <TrendChart data={trendData} />
+          )}
+        </div>
+      )}
 
       {canViewFinancials && (
       <div className="card">

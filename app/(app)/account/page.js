@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { supabase } from '../../../lib/supabaseClient';
 import Button from '../../../lib/Button';
 import { useProfile } from '../../../lib/useProfile';
+import { downloadJson } from '../../../lib/exportJson';
 
 export default function AccountPage() {
   const { isOwner } = useProfile();
@@ -14,6 +15,7 @@ export default function AccountPage() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [successToast, setSuccessToast] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -26,6 +28,29 @@ export default function AccountPage() {
     const t = setTimeout(() => setSuccessToast(false), 3500);
     return () => clearTimeout(t);
   }, [successToast]);
+
+  const handleBackup = async () => {
+    setBackingUp(true);
+    const [grades, groups, students, payments, attendance, transactions] = await Promise.all([
+      supabase.from('grades').select('*'),
+      supabase.from('groups_table').select('*'),
+      supabase.from('students').select('*'),
+      supabase.from('payments').select('*'),
+      supabase.from('attendance').select('*'),
+      supabase.from('payment_transactions').select('*'),
+    ]);
+
+    downloadJson(`نسخة-احتياطية-حصتي-${new Date().toISOString().slice(0, 10)}.json`, {
+      exported_at: new Date().toISOString(),
+      grades: grades.data || [],
+      groups: groups.data || [],
+      students: students.data || [],
+      payments: payments.data || [],
+      attendance: attendance.data || [],
+      payment_transactions: transactions.data || [],
+    });
+    setBackingUp(false);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -68,6 +93,27 @@ export default function AccountPage() {
           <span>👥 إدارة المساعدين</span>
           <span className="muted">←</span>
         </Link>
+      )}
+
+      {isOwner && (
+        <Link href="/activity" className="card row-between" style={{ display: 'flex' }}>
+          <span>📋 سجل النشاط</span>
+          <span className="muted">←</span>
+        </Link>
+      )}
+
+      {isOwner && (
+        <div className="card">
+          <div className="row-between">
+            <div>
+              <strong>💾 نسخة احتياطية شاملة</strong>
+              <div className="muted" style={{ fontSize: 12.5, marginTop: 2 }}>
+                كل بياناتك (صفوف، طلاب، اشتراكات، حضور) في ملف واحد تحتفظ بيه براحتك
+              </div>
+            </div>
+            <Button variant="outline" size="sm" loading={backingUp} onClick={handleBackup}>تنزيل</Button>
+          </div>
+        </div>
       )}
 
       <form onSubmit={handleSubmit} className="card">

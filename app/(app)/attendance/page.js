@@ -11,6 +11,7 @@ import EmptyState from '../../../lib/EmptyState';
 import { downloadCsv } from '../../../lib/exportCsv';
 import SessionSummaryModal from '../../../lib/SessionSummaryModal';
 import { useProfile } from '../../../lib/useProfile';
+import { logActivity } from '../../../lib/activityLog';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -133,6 +134,11 @@ function AttendanceContent() {
       .from('attendance')
       .update({ status, updated_at: new Date().toISOString() })
       .eq('id', row.record.id);
+    logActivity(
+      profile?.display_name || profile?.email,
+      'attendance',
+      `${row.student.name} — ${ATTENDANCE_STATUS_LABELS[status]} (${date})`
+    );
     loadSession();
   };
 
