@@ -2,18 +2,19 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
-import { WEEKDAY_LABELS } from '../../../lib/constants';
+import { WEEKDAY_LABELS, SATURDAY_FIRST_ORDER } from '../../../lib/constants';
 import { scheduleLabel } from '../../../lib/schedule';
 import Button from '../../../lib/Button';
 import { useProfile } from '../../../lib/useProfile';
 import EmptyState from '../../../lib/EmptyState';
+import { IconPencil, IconTrash } from '../../../lib/icons';
 
 const emptyGroupForm = { name: '', days: [], start_time: '', end_time: '' };
 
 function DaysPicker({ selectedDays, onToggle }) {
   return (
     <div className="row" style={{ flexWrap: 'wrap', gap: 4 }}>
-      {WEEKDAY_LABELS.map((label, index) => (
+      {SATURDAY_FIRST_ORDER.map((index) => (
         <button
           key={index}
           type="button"
@@ -25,7 +26,7 @@ function DaysPicker({ selectedDays, onToggle }) {
             border: '1px solid var(--border)',
           }}
         >
-          {label}
+          {WEEKDAY_LABELS[index]}
         </button>
       ))}
     </div>
@@ -267,7 +268,7 @@ export default function GradesPage() {
                 </div>
                 <div className="row">
                   <button
-                    className="btn btn-outline btn-sm"
+                    className="icon-action-btn icon-edit"
                     title="تعديل"
                     onClick={() => {
                       setEditingGradeId(grade.id);
@@ -275,9 +276,11 @@ export default function GradesPage() {
                       setEditGradeFee(String(grade.monthly_fee));
                     }}
                   >
-                    ✏️
+                    <IconPencil size={17} />
                   </button>
-                  <button className="btn btn-danger btn-sm" title="حذف" onClick={() => deleteGrade(grade.id)}>🗑️</button>
+                  <button className="icon-action-btn icon-delete" title="حذف" onClick={() => deleteGrade(grade.id)}>
+                    <IconTrash size={17} />
+                  </button>
                 </div>
               </div>
             )}
@@ -333,8 +336,12 @@ export default function GradesPage() {
                         )}
                       </div>
                       <div className="row">
-                        <button className="btn btn-outline btn-sm" title="تعديل" onClick={() => startEditGroup(group)}>✏️</button>
-                        <button className="btn btn-danger btn-sm" title="حذف" onClick={() => deleteGroup(group.id)}>🗑️</button>
+                        <button className="icon-action-btn icon-edit" title="تعديل" onClick={() => startEditGroup(group)}>
+                          <IconPencil size={16} />
+                        </button>
+                        <button className="icon-action-btn icon-delete" title="حذف" onClick={() => deleteGroup(group.id)}>
+                          <IconTrash size={16} />
+                        </button>
                       </div>
                     </div>
                   )}

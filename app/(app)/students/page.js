@@ -12,6 +12,7 @@ import { logActivity } from '../../../lib/activityLog';
 import { parseCsv } from '../../../lib/csvImport';
 import { downloadCsv } from '../../../lib/exportCsv';
 import { buildWhatsAppLink } from '../../../lib/whatsapp';
+import { IconPencil, IconTrash } from '../../../lib/icons';
 
 export default function StudentsPage() {
   const [students, setStudents] = useState([]);
@@ -365,8 +366,12 @@ export default function StudentsPage() {
           <div className="row">
             {canEdit && (
               <>
-                <Button variant="outline" size="sm" title="تعديل" onClick={() => startEdit(student)}>✏️</Button>
-                <Button variant="danger" size="sm" title="حذف" onClick={() => deleteStudent(student.id, student.name)}>🗑️</Button>
+                <button className="icon-action-btn icon-edit" title="تعديل" onClick={() => startEdit(student)}>
+                  <IconPencil size={17} />
+                </button>
+                <button className="icon-action-btn icon-delete" title="حذف" onClick={() => deleteStudent(student.id, student.name)}>
+                  <IconTrash size={17} />
+                </button>
               </>
             )}
           </div>

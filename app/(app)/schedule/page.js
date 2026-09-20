@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '../../../lib/supabaseClient';
-import { WEEKDAY_LABELS } from '../../../lib/constants';
+import { WEEKDAY_LABELS, SATURDAY_FIRST_ORDER } from '../../../lib/constants';
 import { formatTime12h } from '../../../lib/schedule';
 import { SkeletonCards } from '../../../lib/Skeleton';
 import EmptyState from '../../../lib/EmptyState';
@@ -38,11 +38,10 @@ export default function SchedulePage() {
   // الأسبوع عندنا يبدأ بالسبت وينتهي بالجمعة. وعشان يبقى عملي أكتر،
   // العرض بيبدأ بالنهاردة أولاً وبعدين باقي الأيام بالترتيب بعده، لحد ما
   // يلف على نفس ترتيب الأسبوع (سبت -> جمعة).
-  const SATURDAY_FIRST_WEEK = [6, 0, 1, 2, 3, 4, 5];
-  const todayIndexInWeek = SATURDAY_FIRST_WEEK.indexOf(today);
+  const todayIndexInWeek = SATURDAY_FIRST_ORDER.indexOf(today);
   const orderedDays = [
-    ...SATURDAY_FIRST_WEEK.slice(todayIndexInWeek),
-    ...SATURDAY_FIRST_WEEK.slice(0, todayIndexInWeek),
+    ...SATURDAY_FIRST_ORDER.slice(todayIndexInWeek),
+    ...SATURDAY_FIRST_ORDER.slice(0, todayIndexInWeek),
   ];
   const hasAny = Object.keys(byDay).length > 0;
 

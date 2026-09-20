@@ -82,16 +82,16 @@ function AppShell({ children }) {
       <div className="topbar row-between">
         <div className="topbar-brand">
           <img src="/icons/logo-header.png" alt="حصتي" className="topbar-logo" />
-          <div>
-            <div style={{ fontWeight: 700, lineHeight: 1.15 }}>
+          <div style={{ minWidth: 0, overflow: 'hidden' }}>
+            <div className="topbar-name">
               {teacherIdentity?.display_name || 'حصتي'}
             </div>
             {teacherIdentity?.subject_name && (
-              <div style={{ fontSize: 11.5, opacity: 0.8, fontWeight: 400 }}>{teacherIdentity.subject_name}</div>
+              <div className="topbar-subject">{teacherIdentity.subject_name}</div>
             )}
           </div>
         </div>
-        <div className="row" style={{ gap: 4 }}>
+        <div className="row topbar-icons" style={{ gap: 4 }}>
           <button className="icon-btn" onClick={() => setSearchOpen(true)} title="بحث">
             <IconSearch size={17} />
           </button>
