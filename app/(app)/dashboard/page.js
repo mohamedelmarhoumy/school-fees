@@ -7,6 +7,8 @@ import { WEEKDAY_LABELS, ARABIC_MONTHS } from '../../../lib/constants';
 import { formatTime12h } from '../../../lib/schedule';
 import { SkeletonCards } from '../../../lib/Skeleton';
 import EmptyState from '../../../lib/EmptyState';
+import { useProfile } from '../../../lib/useProfile';
+import GroupUnpaidModal from '../../../lib/GroupUnpaidModal';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -33,59 +35,63 @@ export default function DashboardPage() {
     const d = new Date();
     return d.getHours() * 60 + d.getMinutes();
   });
+  const { profile, isOwner } = useProfile();
+  const canManagePayments = isOwner || !!profile?.can_payments;
+  const [unpaidModal, setUnpaidModal] = useState(null); // { groupId, groupName }
+
+  const load = async () => {
+    setLoading(true);
+    const now = new Date();
+    const todayWeekday = now.getDay();
+    const nowTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`;
+
+    const [{ data: groups }, { data: students }, { data: payments }] = await Promise.all([
+      supabase.from('groups_table').select('*, grades(name)'),
+      supabase.from('students').select('id, group_id'),
+      supabase.from('payments').select('student_id, status').eq('year', now.getFullYear()).eq('month', now.getMonth() + 1),
+    ]);
+
+    const todays = (groups || [])
+      .filter((g) => (g.days_of_week || []).includes(todayWeekday))
+      // اشيل المجموعة اللي فات معادها (وقت انتهائها قبل الوقت الحالي)
+      .filter((g) => !g.end_time || g.end_time >= nowTimeStr)
+      .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
+    setTodaysGroups(todays);
+
+    const groupByStudent = {};
+    const studentCountByGroup = {};
+    (students || []).forEach((s) => {
+      if (!s.group_id) return;
+      groupByStudent[s.id] = s.group_id;
+      studentCountByGroup[s.group_id] = (studentCountByGroup[s.group_id] || 0) + 1;
+    });
+
+    const paidByStudent = {};
+    (payments || []).forEach((p) => {
+      paidByStudent[p.student_id] = p.status;
+    });
+
+    const unpaidByGroup = {};
+    Object.keys(groupByStudent).forEach((studentId) => {
+      const gid = groupByStudent[studentId];
+      const status = paidByStudent[studentId] || 'unpaid';
+      if (status !== 'paid') {
+        unpaidByGroup[gid] = (unpaidByGroup[gid] || 0) + 1;
+      }
+    });
+
+    const stats = {};
+    todays.forEach((g) => {
+      stats[g.id] = {
+        studentCount: studentCountByGroup[g.id] || 0,
+        unpaidCount: unpaidByGroup[g.id] || 0,
+      };
+    });
+    setGroupStats(stats);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      const now = new Date();
-      const todayWeekday = now.getDay();
-      const nowTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`;
-
-      const [{ data: groups }, { data: students }, { data: payments }] = await Promise.all([
-        supabase.from('groups_table').select('*, grades(name)'),
-        supabase.from('students').select('id, group_id'),
-        supabase.from('payments').select('student_id, status').eq('year', now.getFullYear()).eq('month', now.getMonth() + 1),
-      ]);
-
-      const todays = (groups || [])
-        .filter((g) => (g.days_of_week || []).includes(todayWeekday))
-        // اشيل المجموعة اللي فات معادها (وقت انتهائها قبل الوقت الحالي)
-        .filter((g) => !g.end_time || g.end_time >= nowTimeStr)
-        .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
-      setTodaysGroups(todays);
-
-      const groupByStudent = {};
-      const studentCountByGroup = {};
-      (students || []).forEach((s) => {
-        if (!s.group_id) return;
-        groupByStudent[s.id] = s.group_id;
-        studentCountByGroup[s.group_id] = (studentCountByGroup[s.group_id] || 0) + 1;
-      });
-
-      const paidByStudent = {};
-      (payments || []).forEach((p) => {
-        paidByStudent[p.student_id] = p.status;
-      });
-
-      const unpaidByGroup = {};
-      Object.keys(groupByStudent).forEach((studentId) => {
-        const gid = groupByStudent[studentId];
-        const status = paidByStudent[studentId] || 'unpaid';
-        if (status !== 'paid') {
-          unpaidByGroup[gid] = (unpaidByGroup[gid] || 0) + 1;
-        }
-      });
-
-      const stats = {};
-      todays.forEach((g) => {
-        stats[g.id] = {
-          studentCount: studentCountByGroup[g.id] || 0,
-          unpaidCount: unpaidByGroup[g.id] || 0,
-        };
-      });
-      setGroupStats(stats);
-      setLoading(false);
-    };
     load();
 
     const interval = setInterval(() => {
@@ -93,6 +99,7 @@ export default function DashboardPage() {
       setNowMinutes(d.getHours() * 60 + d.getMinutes());
     }, 60000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const today = new Date();
@@ -134,7 +141,11 @@ export default function DashboardPage() {
           const stats = groupStats[g.id] || { studentCount: 0, unpaidCount: 0 };
 
           return (
-            <Link key={g.id} href={`/attendance?groupId=${g.id}&date=${todayStr()}`} className="group-card">
+            <Link
+              key={g.id}
+              href={`/attendance?groupId=${g.id}&date=${todayStr()}`}
+              className={`group-card${isLive ? ' is-live' : ''}`}
+            >
               <div className="row-between">
                 <strong>{g.grades?.name} — {g.name}</strong>
                 {(isLive || isUpcoming) && (
@@ -143,12 +154,28 @@ export default function DashboardPage() {
                   </span>
                 )}
               </div>
-              <div className="muted group-card-details">
-                👥 {stats.studentCount} طالب
+              <div className="muted group-card-details row" style={{ gap: 6 }}>
+                <span>👥 {stats.studentCount} طالب</span>
                 {g.start_time && (
-                  <> • ⏰ {formatTime12h(g.start_time)}{g.end_time ? ` - ${formatTime12h(g.end_time)}` : ''}</>
+                  <span>⏰ {formatTime12h(g.start_time)}{g.end_time ? ` - ${formatTime12h(g.end_time)}` : ''}</span>
                 )}
-                {stats.unpaidCount > 0 && <> • ⚠️ {stats.unpaidCount} مدفعش</>}
+                {stats.unpaidCount > 0 && (
+                  canManagePayments ? (
+                    <button
+                      type="button"
+                      className="unpaid-badge"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setUnpaidModal({ groupId: g.id, groupName: `${g.grades?.name} — ${g.name}` });
+                      }}
+                    >
+                      ⚠️ {stats.unpaidCount} مدفعش
+                    </button>
+                  ) : (
+                    <span>⚠️ {stats.unpaidCount} مدفعش</span>
+                  )
+                )}
               </div>
               {startMin !== null && endMin !== null && (
                 <div style={{ marginTop: 8 }}>
@@ -164,6 +191,14 @@ export default function DashboardPage() {
             </Link>
           );
         })}
+
+      <GroupUnpaidModal
+        open={!!unpaidModal}
+        onClose={() => setUnpaidModal(null)}
+        groupId={unpaidModal?.groupId}
+        groupName={unpaidModal?.groupName}
+        onChanged={load}
+      />
     </div>
   );
 }

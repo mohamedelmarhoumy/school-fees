@@ -7,7 +7,9 @@ import { scheduleLabel } from '../../../lib/schedule';
 import Button from '../../../lib/Button';
 import { useProfile } from '../../../lib/useProfile';
 import EmptyState from '../../../lib/EmptyState';
-import { IconPencil, IconTrash } from '../../../lib/icons';
+import { IconPencil, IconTrash, IconMessage } from '../../../lib/icons';
+import BulkWhatsAppModal from '../../../lib/BulkWhatsAppModal';
+import SlideUpModal from '../../../lib/SlideUpModal';
 
 const emptyGroupForm = { name: '', days: [], start_time: '', end_time: '' };
 
@@ -47,6 +49,10 @@ export default function GradesPage() {
   const [editGroupForm, setEditGroupForm] = useState(emptyGroupForm);
   const [addingGrade, setAddingGrade] = useState(false);
   const [addingGroupFor, setAddingGroupFor] = useState(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkRecipients, setBulkRecipients] = useState([]);
+  const [bulkTitle, setBulkTitle] = useState('');
+  const [addGradeOpen, setAddGradeOpen] = useState(false);
   const { loading: profileLoading, isOwner } = useProfile();
   const [groupStats, setGroupStats] = useState({});
   const [loadingStats, setLoadingStats] = useState(true);
@@ -132,6 +138,7 @@ export default function GradesPage() {
     setNewGradeFee('');
     await loadAll();
     setAddingGrade(false);
+    setAddGradeOpen(false);
   };
 
   const saveGradeEdit = async (id) => {
@@ -214,6 +221,27 @@ export default function GradesPage() {
     loadAll();
   };
 
+  const openGroupBulkMessage = async (group, gradeName) => {
+    const { data } = await supabase.from('students').select('*').eq('group_id', group.id);
+    setBulkRecipients(
+      (data || []).map((s) => ({ name: s.name, phone: s.parent_phone, groupName: group.name, gradeName }))
+    );
+    setBulkTitle(`مجموعة ${group.name}`);
+    setBulkOpen(true);
+  };
+
+  const openGradeBulkMessage = async (grade) => {
+    const { data } = await supabase
+      .from('students')
+      .select('*, groups_table(name)')
+      .eq('grade_id', grade.id);
+    setBulkRecipients(
+      (data || []).map((s) => ({ name: s.name, phone: s.parent_phone, groupName: s.groups_table?.name, gradeName: grade.name }))
+    );
+    setBulkTitle(`صف ${grade.name} (كل المجموعات)`);
+    setBulkOpen(true);
+  };
+
   if (profileLoading) return <div className="muted">جارِ التحميل...</div>;
   if (!isOwner) {
     return <EmptyState title="غير مصرح لك بالدخول هنا" hint="إدارة الصفوف والمجموعات للمدرس (صاحب الحساب) بس." />;
@@ -225,24 +253,7 @@ export default function GradesPage() {
     <div>
       <h2>الصفوف والمجموعات</h2>
 
-      <form onSubmit={addGrade} className="card row">
-        <input
-          placeholder="اسم الصف الجديد"
-          value={newGradeName}
-          onChange={(e) => setNewGradeName(e.target.value)}
-          style={{ flex: 2 }}
-        />
-        <input
-          type="number"
-          placeholder="الاشتراك الشهري"
-          value={newGradeFee}
-          onChange={(e) => setNewGradeFee(e.target.value)}
-          style={{ flex: 1 }}
-        />
-        <Button type="submit" loading={addingGrade}>إضافة صف</Button>
-      </form>
-
-      {grades.length === 0 && <div className="muted">لا توجد صفوف بعد — أضف أول صف فوق.</div>}
+      {grades.length === 0 && <div className="muted">لا توجد صفوف بعد — دوس ➕ عشان تضيف أول صف.</div>}
 
       {grades.map((grade) => {
         const newGroupForm = getNewGroupForm(grade.id);
@@ -267,6 +278,14 @@ export default function GradesPage() {
                   <span className="muted">— اشتراك شهري: {grade.monthly_fee}</span>
                 </div>
                 <div className="row">
+                  <button
+                    className="icon-action-btn"
+                    style={{ color: '#16a34a' }}
+                    title="رسالة جماعية للصف بالكامل"
+                    onClick={() => openGradeBulkMessage(grade)}
+                  >
+                    <IconMessage size={17} />
+                  </button>
                   <button
                     className="icon-action-btn icon-edit"
                     title="تعديل"
@@ -336,6 +355,14 @@ export default function GradesPage() {
                         )}
                       </div>
                       <div className="row">
+                        <button
+                          className="icon-action-btn"
+                          style={{ color: '#16a34a' }}
+                          title="رسالة جماعية للمجموعة"
+                          onClick={() => openGroupBulkMessage(group, grade.name)}
+                        >
+                          <IconMessage size={16} />
+                        </button>
                         <button className="icon-action-btn icon-edit" title="تعديل" onClick={() => startEditGroup(group)}>
                           <IconPencil size={16} />
                         </button>
@@ -379,6 +406,39 @@ export default function GradesPage() {
           </div>
         );
       })}
+
+      <button className="fab" onClick={() => setAddGradeOpen(true)} title="إضافة صف جديد">+</button>
+
+      <SlideUpModal open={addGradeOpen} onClose={() => setAddGradeOpen(false)} title="إضافة صف جديد">
+        <form onSubmit={addGrade}>
+          <div className="row">
+            <input
+              placeholder="اسم الصف الجديد"
+              value={newGradeName}
+              onChange={(e) => setNewGradeName(e.target.value)}
+              style={{ flex: 2 }}
+              autoFocus
+            />
+            <input
+              type="number"
+              placeholder="الاشتراك الشهري"
+              value={newGradeFee}
+              onChange={(e) => setNewGradeFee(e.target.value)}
+              style={{ flex: 1 }}
+            />
+          </div>
+          <Button type="submit" loading={addingGrade} style={{ marginTop: 10, width: '100%', justifyContent: 'center' }}>
+            إضافة الصف
+          </Button>
+        </form>
+      </SlideUpModal>
+
+      <BulkWhatsAppModal
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        recipients={bulkRecipients}
+        title={bulkTitle}
+      />
     </div>
   );
 }

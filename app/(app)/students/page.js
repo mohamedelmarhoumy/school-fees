@@ -13,6 +13,7 @@ import { parseCsv } from '../../../lib/csvImport';
 import { downloadCsv } from '../../../lib/exportCsv';
 import { buildWhatsAppLink } from '../../../lib/whatsapp';
 import { IconPencil, IconTrash } from '../../../lib/icons';
+import SlideUpModal from '../../../lib/SlideUpModal';
 
 export default function StudentsPage() {
   const [students, setStudents] = useState([]);
@@ -31,6 +32,7 @@ export default function StudentsPage() {
   const [importing, setImporting] = useState(false);
   const [importSummary, setImportSummary] = useState(null);
   const [justAdded, setJustAdded] = useState(null);
+  const [addStudentOpen, setAddStudentOpen] = useState(false);
 
   const loadAll = async () => {
     setLoading(true);
@@ -95,6 +97,7 @@ export default function StudentsPage() {
     resetForm();
     await loadAll();
     setSaving(false);
+    setAddStudentOpen(false);
   };
 
   const startEdit = (student) => {
@@ -286,7 +289,15 @@ export default function StudentsPage() {
       )}
 
       {canEdit && (
-      <form onSubmit={handleSubmit} className="card">
+      <SlideUpModal
+        open={addStudentOpen || !!editingId}
+        onClose={() => {
+          resetForm();
+          setAddStudentOpen(false);
+        }}
+        title={editingId ? 'تعديل بيانات طالب' : 'إضافة طالب جديد'}
+      >
+        <form onSubmit={handleSubmit}>
         <div className="row">
           <input
             placeholder="اسم الطالب"
@@ -334,12 +345,12 @@ export default function StudentsPage() {
           </select>
         </div>
         <div className="row" style={{ marginTop: 8 }}>
-          <Button type="submit" loading={saving}>{editingId ? 'حفظ التعديل' : 'إضافة طالب'}</Button>
-          {editingId && (
-            <Button type="button" variant="outline" onClick={resetForm}>إلغاء</Button>
-          )}
+          <Button type="submit" loading={saving} style={{ flex: 1, justifyContent: 'center' }}>
+            {editingId ? 'حفظ التعديل' : 'إضافة طالب'}
+          </Button>
         </div>
-      </form>
+        </form>
+      </SlideUpModal>
       )}
 
       <input
@@ -377,6 +388,10 @@ export default function StudentsPage() {
           </div>
         </div>
       ))}
+
+      {canEdit && (
+        <button className="fab" onClick={() => setAddStudentOpen(true)} title="إضافة طالب جديد">+</button>
+      )}
     </div>
   );
 }
