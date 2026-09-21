@@ -12,6 +12,9 @@ const ACTION_ICONS = {
   student_added: '➕',
   student_updated: '✏️',
   student_deleted: '🗑️',
+  expense_added: '📤',
+  expense_updated: '✏️',
+  expense_deleted: '🗑️',
 };
 
 export default function ActivityLogPage() {

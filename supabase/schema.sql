@@ -213,6 +213,29 @@ create policy "attendance update" on attendance for update using (teacher_id = e
 create policy "attendance delete" on attendance for delete using (teacher_id = effective_teacher_id() and is_owner());
 
 -- ============================================================
+-- 6) المصروفات (Expenses) — وحدة صافي الأرباح
+-- ============================================================
+create table if not exists expenses (
+  id uuid primary key default gen_random_uuid(),
+  teacher_id uuid not null default effective_teacher_id() references auth.users(id) on delete cascade,
+  title text not null,
+  amount numeric not null default 0,
+  expense_date date not null default current_date,
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_expenses_teacher_date on expenses (teacher_id, expense_date);
+
+alter table expenses enable row level security;
+
+-- مقصورة على owner أو عضو فريق عنده صلاحية "التقارير المالية" تحديداً
+create policy "financials manage expenses" on expenses for all
+  using (teacher_id = effective_teacher_id() and (is_owner() or has_perm('financials')))
+  with check (teacher_id = effective_teacher_id() and (is_owner() or has_perm('financials')));
+
+-- ============================================================
 -- 5) سجل النشاط — متابعة المدرس لأفعال المساعدين
 -- ============================================================
 create table if not exists activity_log (

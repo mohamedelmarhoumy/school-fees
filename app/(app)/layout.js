@@ -12,7 +12,7 @@ import { useProfile } from '../../lib/useProfile';
 import ProfileProvider from '../../lib/ProfileProvider';
 
 const ALL_NAV_ITEMS = [
-  { href: '/accounts', Icon: IconWallet, label: 'الحسابات', show: (p) => p.isOwner || p.profile?.can_payments },
+  { href: '/accounts', Icon: IconWallet, label: 'الحسابات', show: (p) => p.isOwner || p.profile?.can_payments || p.profile?.can_view_financials },
   { href: '/attendance', Icon: IconCheckClipboard, label: 'الحضور', show: (p) => p.isOwner || p.profile?.can_attendance },
   { href: '/students', Icon: IconUsers, label: 'الطلاب', show: (p) => p.isOwner || p.profile?.can_attendance || p.profile?.can_payments || p.profile?.can_students },
   { href: '/grades', Icon: IconBuilding, label: 'الصفوف', show: (p) => p.isOwner },
