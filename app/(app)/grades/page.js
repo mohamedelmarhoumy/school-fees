@@ -35,6 +35,27 @@ function DaysPicker({ selectedDays, onToggle }) {
   );
 }
 
+function GroupForm({ form, onChange, onToggleDay }) {
+  return (
+    <div>
+      <input
+        placeholder="اسم المجموعة"
+        value={form.name}
+        onChange={(e) => onChange({ ...form, name: e.target.value })}
+        style={{ width: '100%' }}
+        autoFocus
+      />
+      <div className="row" style={{ marginTop: 8 }}>
+        <input type="time" value={form.start_time} onChange={(e) => onChange({ ...form, start_time: e.target.value })} />
+        <span className="muted">إلى</span>
+        <input type="time" value={form.end_time} onChange={(e) => onChange({ ...form, end_time: e.target.value })} />
+      </div>
+      <div className="muted" style={{ marginTop: 10, marginBottom: 4 }}>أيام الأسبوع</div>
+      <DaysPicker selectedDays={form.days} onToggle={onToggleDay} />
+    </div>
+  );
+}
+
 export default function GradesPage() {
   const [grades, setGrades] = useState([]);
   const [groupsByGrade, setGroupsByGrade] = useState({});
@@ -53,6 +74,8 @@ export default function GradesPage() {
   const [bulkRecipients, setBulkRecipients] = useState([]);
   const [bulkTitle, setBulkTitle] = useState('');
   const [addGradeOpen, setAddGradeOpen] = useState(false);
+  const [addGroupGradeId, setAddGroupGradeId] = useState(null);
+  const [savingGroupEdit, setSavingGroupEdit] = useState(false);
   const { loading: profileLoading, isOwner } = useProfile();
   const [groupStats, setGroupStats] = useState({});
   const [loadingStats, setLoadingStats] = useState(true);
@@ -182,6 +205,7 @@ export default function GradesPage() {
     setNewGroupFormByGrade((s) => ({ ...s, [gradeId]: emptyGroupForm }));
     await loadAll();
     setAddingGroupFor(null);
+    setAddGroupGradeId(null);
   };
 
   const startEditGroup = (group) => {
@@ -200,7 +224,8 @@ export default function GradesPage() {
     setEditGroupForm({ ...editGroupForm, days: next });
   };
 
-  const saveGroupEdit = async (id) => {
+  const saveGroupEdit = async () => {
+    setSavingGroupEdit(true);
     await supabase
       .from('groups_table')
       .update({
@@ -210,7 +235,8 @@ export default function GradesPage() {
         end_time: editGroupForm.end_time || null,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', id);
+      .eq('id', editingGroupId);
+    setSavingGroupEdit(false);
     setEditingGroupId(null);
     loadAll();
   };
@@ -249,163 +275,113 @@ export default function GradesPage() {
 
   if (loading) return <div className="muted">جارِ التحميل...</div>;
 
+  const addGroupGrade = grades.find((g) => g.id === addGroupGradeId);
+
   return (
     <div>
       <h2>الصفوف والمجموعات</h2>
 
       {grades.length === 0 && <div className="muted">لا توجد صفوف بعد — دوس ➕ عشان تضيف أول صف.</div>}
 
-      {grades.map((grade) => {
-        const newGroupForm = getNewGroupForm(grade.id);
-        return (
-          <div key={grade.id} className="card">
-            {editingGradeId === grade.id ? (
-              <div className="row">
-                <input value={editGradeName} onChange={(e) => setEditGradeName(e.target.value)} style={{ flex: 2 }} />
-                <input
-                  type="number"
-                  value={editGradeFee}
-                  onChange={(e) => setEditGradeFee(e.target.value)}
-                  style={{ flex: 1 }}
-                />
-                <button className="btn btn-sm" onClick={() => saveGradeEdit(grade.id)}>حفظ</button>
-                <button className="btn btn-outline btn-sm" onClick={() => setEditingGradeId(null)}>إلغاء</button>
+      {grades.map((grade) => (
+        <div key={grade.id} className="card">
+          {editingGradeId === grade.id ? (
+            <div className="row">
+              <input value={editGradeName} onChange={(e) => setEditGradeName(e.target.value)} style={{ flex: 2 }} />
+              <input
+                type="number"
+                value={editGradeFee}
+                onChange={(e) => setEditGradeFee(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <button className="btn btn-sm" onClick={() => saveGradeEdit(grade.id)}>حفظ</button>
+              <button className="btn btn-outline btn-sm" onClick={() => setEditingGradeId(null)}>إلغاء</button>
+            </div>
+          ) : (
+            <div className="row-between">
+              <div>
+                <strong>{grade.name}</strong>{' '}
+                <span className="muted">— اشتراك شهري: {grade.monthly_fee}</span>
               </div>
-            ) : (
-              <div className="row-between">
-                <div>
-                  <strong>{grade.name}</strong>{' '}
-                  <span className="muted">— اشتراك شهري: {grade.monthly_fee}</span>
-                </div>
-                <div className="row">
-                  <button
-                    className="icon-action-btn"
-                    style={{ color: '#16a34a' }}
-                    title="رسالة جماعية للصف بالكامل"
-                    onClick={() => openGradeBulkMessage(grade)}
-                  >
-                    <IconMessage size={17} />
-                  </button>
-                  <button
-                    className="icon-action-btn icon-edit"
-                    title="تعديل"
-                    onClick={() => {
-                      setEditingGradeId(grade.id);
-                      setEditGradeName(grade.name);
-                      setEditGradeFee(String(grade.monthly_fee));
-                    }}
-                  >
-                    <IconPencil size={17} />
-                  </button>
-                  <button className="icon-action-btn icon-delete" title="حذف" onClick={() => deleteGrade(grade.id)}>
-                    <IconTrash size={17} />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div style={{ marginTop: 10, paddingRight: 12, borderRight: '2px solid #e5e7eb' }}>
-              {(groupsByGrade[grade.id] || []).map((group) => (
-                <div key={group.id} style={{ padding: '8px 0', borderBottom: '1px solid #f1f2f4' }}>
-                  {editingGroupId === group.id ? (
-                    <div>
-                      <div className="row">
-                        <input
-                          value={editGroupForm.name}
-                          onChange={(e) => setEditGroupForm({ ...editGroupForm, name: e.target.value })}
-                          style={{ flex: 1 }}
-                        />
-                        <input
-                          type="time"
-                          value={editGroupForm.start_time}
-                          onChange={(e) => setEditGroupForm({ ...editGroupForm, start_time: e.target.value })}
-                        />
-                        <span className="muted">إلى</span>
-                        <input
-                          type="time"
-                          value={editGroupForm.end_time}
-                          onChange={(e) => setEditGroupForm({ ...editGroupForm, end_time: e.target.value })}
-                        />
-                      </div>
-                      <div style={{ marginTop: 6 }}>
-                        <DaysPicker selectedDays={editGroupForm.days} onToggle={toggleEditGroupDay} />
-                      </div>
-                      <div className="row" style={{ marginTop: 6 }}>
-                        <button className="btn btn-sm" onClick={() => saveGroupEdit(group.id)}>حفظ</button>
-                        <button className="btn btn-outline btn-sm" onClick={() => setEditingGroupId(null)}>إلغاء</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="row-between">
-                      <div>
-                        <span>{group.name}</span>
-                        {scheduleLabel(group) && (
-                          <div className="muted" style={{ fontSize: 12 }}>{scheduleLabel(group)}</div>
-                        )}
-                        {!loadingStats && groupStats[group.id] && (
-                          <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-                            👥 {groupStats[group.id].studentCount} طالب
-                            {groupStats[group.id].attendanceRate !== null && (
-                              <> · 📊 حضور {groupStats[group.id].attendanceRate}%</>
-                            )}
-                            {groupStats[group.id].paidTotal > 0 && (
-                              <> · 💰 {groupStats[group.id].paidCount}/{groupStats[group.id].paidTotal} دافعين</>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <div className="row">
-                        <button
-                          className="icon-action-btn"
-                          style={{ color: '#16a34a' }}
-                          title="رسالة جماعية للمجموعة"
-                          onClick={() => openGroupBulkMessage(group, grade.name)}
-                        >
-                          <IconMessage size={16} />
-                        </button>
-                        <button className="icon-action-btn icon-edit" title="تعديل" onClick={() => startEditGroup(group)}>
-                          <IconPencil size={16} />
-                        </button>
-                        <button className="icon-action-btn icon-delete" title="حذف" onClick={() => deleteGroup(group.id)}>
-                          <IconTrash size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              <div style={{ marginTop: 8 }}>
-                <div className="row">
-                  <input
-                    placeholder="اسم مجموعة جديدة"
-                    value={newGroupForm.name}
-                    onChange={(e) => updateNewGroupForm(grade.id, { name: e.target.value })}
-                    style={{ flex: 1 }}
-                  />
-                  <input
-                    type="time"
-                    value={newGroupForm.start_time}
-                    onChange={(e) => updateNewGroupForm(grade.id, { start_time: e.target.value })}
-                  />
-                  <span className="muted">إلى</span>
-                  <input
-                    type="time"
-                    value={newGroupForm.end_time}
-                    onChange={(e) => updateNewGroupForm(grade.id, { end_time: e.target.value })}
-                  />
-                </div>
-                <div style={{ marginTop: 6 }}>
-                  <DaysPicker selectedDays={newGroupForm.days} onToggle={(d) => toggleNewGroupDay(grade.id, d)} />
-                </div>
-                <Button size="sm" style={{ marginTop: 6 }} loading={addingGroupFor === grade.id} onClick={() => addGroup(grade.id)}>
-                  إضافة مجموعة
-                </Button>
+              <div className="row" style={{ gap: 2 }}>
+                <button
+                  className="icon-action-btn"
+                  style={{ color: '#16a34a' }}
+                  title="رسالة جماعية للصف بالكامل"
+                  onClick={() => openGradeBulkMessage(grade)}
+                >
+                  <IconMessage size={17} />
+                </button>
+                <button
+                  className="icon-action-btn icon-edit"
+                  title="تعديل"
+                  onClick={() => {
+                    setEditingGradeId(grade.id);
+                    setEditGradeName(grade.name);
+                    setEditGradeFee(String(grade.monthly_fee));
+                  }}
+                >
+                  <IconPencil size={17} />
+                </button>
+                <button className="icon-action-btn icon-delete" title="حذف" onClick={() => deleteGrade(grade.id)}>
+                  <IconTrash size={17} />
+                </button>
               </div>
             </div>
+          )}
+
+          <div style={{ marginTop: 10 }}>
+            {(groupsByGrade[grade.id] || []).map((group) => (
+              <div key={group.id} className="group-subcard">
+                <div className="row-between" style={{ alignItems: 'flex-start' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700 }}>{group.name}</div>
+                    {scheduleLabel(group) && (
+                      <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{scheduleLabel(group)}</div>
+                    )}
+                    {!loadingStats && groupStats[group.id] && (
+                      <div className="row" style={{ gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
+                        <span className="stat-chip">👥 {groupStats[group.id].studentCount}</span>
+                        {groupStats[group.id].attendanceRate !== null && (
+                          <span className="stat-chip">📊 {groupStats[group.id].attendanceRate}%</span>
+                        )}
+                        {groupStats[group.id].paidTotal > 0 && (
+                          <span className="stat-chip">💰 {groupStats[group.id].paidCount}/{groupStats[group.id].paidTotal}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="row" style={{ gap: 2, flexShrink: 0 }}>
+                    <button
+                      className="icon-action-btn"
+                      style={{ color: '#16a34a' }}
+                      title="رسالة جماعية للمجموعة"
+                      onClick={() => openGroupBulkMessage(group, grade.name)}
+                    >
+                      <IconMessage size={16} />
+                    </button>
+                    <button className="icon-action-btn icon-edit" title="تعديل" onClick={() => startEditGroup(group)}>
+                      <IconPencil size={16} />
+                    </button>
+                    <button className="icon-action-btn icon-delete" title="حذف" onClick={() => deleteGroup(group.id)}>
+                      <IconTrash size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <Button
+              variant="outline"
+              size="sm"
+              style={{ marginTop: 8, width: '100%', justifyContent: 'center' }}
+              onClick={() => setAddGroupGradeId(grade.id)}
+            >
+              + إضافة مجموعة
+            </Button>
           </div>
-        );
-      })}
+        </div>
+      ))}
 
       <button className="fab" onClick={() => setAddGradeOpen(true)} title="إضافة صف جديد">+</button>
 
@@ -431,6 +407,36 @@ export default function GradesPage() {
             إضافة الصف
           </Button>
         </form>
+      </SlideUpModal>
+
+      <SlideUpModal
+        open={!!addGroupGradeId}
+        onClose={() => setAddGroupGradeId(null)}
+        title={`إضافة مجموعة${addGroupGrade ? ' — ' + addGroupGrade.name : ''}`}
+      >
+        {addGroupGradeId && (
+          <div>
+            <GroupForm
+              form={getNewGroupForm(addGroupGradeId)}
+              onChange={(f) => setNewGroupFormByGrade((s) => ({ ...s, [addGroupGradeId]: f }))}
+              onToggleDay={(d) => toggleNewGroupDay(addGroupGradeId, d)}
+            />
+            <Button
+              loading={addingGroupFor === addGroupGradeId}
+              style={{ marginTop: 12, width: '100%', justifyContent: 'center' }}
+              onClick={() => addGroup(addGroupGradeId)}
+            >
+              إضافة المجموعة
+            </Button>
+          </div>
+        )}
+      </SlideUpModal>
+
+      <SlideUpModal open={!!editingGroupId} onClose={() => setEditingGroupId(null)} title="تعديل المجموعة">
+        <GroupForm form={editGroupForm} onChange={setEditGroupForm} onToggleDay={toggleEditGroupDay} />
+        <Button loading={savingGroupEdit} style={{ marginTop: 12, width: '100%', justifyContent: 'center' }} onClick={saveGroupEdit}>
+          حفظ التعديل
+        </Button>
       </SlideUpModal>
 
       <BulkWhatsAppModal

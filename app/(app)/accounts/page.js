@@ -163,7 +163,7 @@ export default function AccountsPage() {
     });
 
     const chartData = months.map((m) => ({
-      label: ARABIC_MONTHS[m.month - 1].slice(0, 3),
+      label: ARABIC_MONTHS[m.month - 1],
       value: Math.round(totalsByKey[`${m.year}-${m.month}`] || 0),
     }));
     setTrendData(chartData);
@@ -383,7 +383,7 @@ export default function AccountsPage() {
             <div className="stat-value" style={{ fontSize: 17 }}>{totalPaid.toFixed(0)}</div>
             <div className="stat-label">إجمالي التحصيل</div>
           </div>
-          <div className="stat-card" style={{ background: 'rgba(220,38,38,0.1)', color: '#dc2626' }}>
+          <div className="stat-card" style={{ background: 'rgba(245,158,11,0.12)', color: '#b45309' }}>
             <div className="stat-value" style={{ fontSize: 17 }}>{totalExpenses.toFixed(0)}</div>
             <div className="stat-label">إجمالي المصروفات</div>
           </div>
@@ -564,7 +564,7 @@ export default function AccountsPage() {
                   {expense.notes && <div className="muted" style={{ fontSize: 12.5, marginTop: 2 }}>{expense.notes}</div>}
                 </div>
                 <div className="row" style={{ gap: 4 }}>
-                  <strong style={{ color: '#dc2626', marginLeft: 6 }}>{Number(expense.amount).toFixed(0)} جنيه</strong>
+                  <strong style={{ color: '#b45309', marginLeft: 6 }}>{Number(expense.amount).toFixed(0)} جنيه</strong>
                   <button className="icon-action-btn icon-edit" title="تعديل" onClick={() => startEditExpense(expense)}>
                     <IconPencil size={16} />
                   </button>

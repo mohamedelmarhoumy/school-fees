@@ -427,7 +427,7 @@ input[type="date"], input[type="time"] {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 60;
+  z-index: 200;
   display: flex;
   justify-content: center;
   padding: 70px 12px 0;
@@ -506,7 +506,7 @@ input[type="date"], input[type="time"] {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 60;
+  z-index: 200;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -519,7 +519,7 @@ input[type="date"], input[type="time"] {
   max-width: 480px;
   max-height: 85vh;
   overflow-y: auto;
-  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  padding: 18px 16px calc(48px + env(safe-area-inset-bottom));
   box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.3);
   animation: slideUp 0.25s ease both;
 }
@@ -569,6 +569,26 @@ input[type="date"], input[type="time"] {
   transition: transform 0.1s ease, background 0.15s ease;
 }
 .unpaid-badge:active { transform: scale(0.94); background: rgba(220, 38, 38, 0.2); }
+
+.group-subcard {
+  background: var(--input-bg);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+}
+
+.stat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--card-bg);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
 
 .group-card {
   display: block;
