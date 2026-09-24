@@ -22,6 +22,9 @@
   --accent-shadow: rgba(31, 41, 55, 0.15);
   --btn-primary-bg: #1f2937;
   --btn-primary-text: #f9fafb;
+  --icon-message: #64748b;
+  --icon-edit: #94a3b8;
+  --icon-delete: rgba(220, 38, 38, 0.65);
 }
 
 [data-theme="dark"] {
@@ -44,6 +47,9 @@
   --accent-shadow: rgba(148, 163, 184, 0.25);
   --btn-primary-bg: #2a3140;
   --btn-primary-text: #f9fafb;
+  --icon-message: #94a3b8;
+  --icon-edit: #cbd5e1;
+  --icon-delete: #f87171;
 }
 
 html, body {
@@ -630,8 +636,46 @@ input[type="date"], input[type="time"] {
   transition: transform 0.1s ease, opacity 0.15s ease, background 0.15s ease;
 }
 .icon-action-btn:active { transform: scale(0.88); background: rgba(148, 163, 184, 0.15); }
-.icon-edit { color: #f59e0b; }
-.icon-delete { color: #dc2626; }
+.icon-edit { color: var(--icon-edit); }
+.icon-delete { color: var(--icon-delete); }
+.icon-message { color: var(--icon-message); }
+
+/* ===== Kebab (⋮) dropdown menu ===== */
+.kebab-menu { position: relative; }
+.kebab-dropdown {
+  position: absolute;
+  top: 38px;
+  z-index: 60;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18);
+  padding: 6px;
+  min-width: 172px;
+  animation: fadeSlideIn 0.15s ease both;
+}
+.kebab-dropdown-start { left: 0; }
+.kebab-dropdown-end { right: 0; }
+.kebab-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 13.5px;
+  font-family: inherit;
+  text-align: right;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.kebab-item:hover, .kebab-item:active { background: var(--input-bg); }
+.kebab-item-danger { color: #dc2626; }
+[data-theme="dark"] .kebab-item-danger { color: #f87171; }
+.kebab-item-icon { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
 
 /* ===== QR Attendance Scanner ===== */
 .scanner-overlay {

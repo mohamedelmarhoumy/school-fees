@@ -10,6 +10,7 @@ import EmptyState from '../../../lib/EmptyState';
 import { IconPencil, IconTrash, IconMessage } from '../../../lib/icons';
 import BulkWhatsAppModal from '../../../lib/BulkWhatsAppModal';
 import SlideUpModal from '../../../lib/SlideUpModal';
+import KebabMenu from '../../../lib/KebabMenu';
 
 const emptyGroupForm = { name: '', days: [], start_time: '', end_time: '' };
 
@@ -304,28 +305,22 @@ export default function GradesPage() {
                 <span className="muted">— اشتراك شهري: {grade.monthly_fee}</span>
               </div>
               <div className="row" style={{ gap: 2 }}>
-                <button
-                  className="icon-action-btn"
-                  style={{ color: '#16a34a' }}
-                  title="رسالة جماعية للصف بالكامل"
-                  onClick={() => openGradeBulkMessage(grade)}
-                >
-                  <IconMessage size={17} />
-                </button>
-                <button
-                  className="icon-action-btn icon-edit"
-                  title="تعديل"
-                  onClick={() => {
-                    setEditingGradeId(grade.id);
-                    setEditGradeName(grade.name);
-                    setEditGradeFee(String(grade.monthly_fee));
-                  }}
-                >
-                  <IconPencil size={17} />
-                </button>
-                <button className="icon-action-btn icon-delete" title="حذف" onClick={() => deleteGrade(grade.id)}>
-                  <IconTrash size={17} />
-                </button>
+                <KebabMenu
+                  title="خيارات الصف"
+                  items={[
+                    { icon: '💬', label: 'إرسال رسالة', onClick: () => openGradeBulkMessage(grade) },
+                    {
+                      icon: '✏️',
+                      label: 'تعديل الصف',
+                      onClick: () => {
+                        setEditingGradeId(grade.id);
+                        setEditGradeName(grade.name);
+                        setEditGradeFee(String(grade.monthly_fee));
+                      },
+                    },
+                    { icon: '🗑️', label: 'حذف الصف', onClick: () => deleteGrade(grade.id), danger: true },
+                  ]}
+                />
               </div>
             </div>
           )}
@@ -353,8 +348,7 @@ export default function GradesPage() {
                   </div>
                   <div className="row" style={{ gap: 2, flexShrink: 0 }}>
                     <button
-                      className="icon-action-btn"
-                      style={{ color: '#16a34a' }}
+                      className="icon-action-btn icon-message"
                       title="رسالة جماعية للمجموعة"
                       onClick={() => openGroupBulkMessage(group, grade.name)}
                     >

@@ -66,6 +66,7 @@ export default function StudentDetailPage() {
       groupName: group?.name,
       qrDataUrl,
       schoolName: profile?.subject_name || 'كارنيه الطالب',
+      teacherName: profile?.display_name || '',
     });
   };
 
