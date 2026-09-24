@@ -4,15 +4,23 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../../lib/supabaseClient';
 import { ARABIC_MONTHS, PAYMENT_STATUS_COLORS, ATTENDANCE_STATUS_LABELS, ATTENDANCE_STATUS_COLORS } from '../../../../lib/constants';
+import { studentQrDataUrl } from '../../../../lib/qr';
+import { printStudentCard } from '../../../../lib/printStudentCard';
+import Button from '../../../../lib/Button';
+import { useProfile } from '../../../../lib/useProfile';
 
 export default function StudentDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const [student, setStudent] = useState(null);
+  const [grade, setGrade] = useState(null);
+  const [group, setGroup] = useState(null);
   const [payments, setPayments] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [tab, setTab] = useState('payments');
   const [loading, setLoading] = useState(true);
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const { profile } = useProfile();
 
   useEffect(() => {
     const load = async () => {
@@ -32,10 +40,34 @@ export default function StudentDetailPage() {
       setStudent(studentData);
       setPayments(paymentsData || []);
       setAttendance(attendanceData || []);
+
+      if (studentData?.grade_id) {
+        const { data: gradeData } = await supabase.from('grades').select('*').eq('id', studentData.grade_id).single();
+        setGrade(gradeData || null);
+      }
+      if (studentData?.group_id) {
+        const { data: groupData } = await supabase.from('groups_table').select('*').eq('id', studentData.group_id).single();
+        setGroup(groupData || null);
+      }
+      if (studentData?.id) {
+        setQrDataUrl(await studentQrDataUrl(studentData.id));
+      }
       setLoading(false);
     };
     load();
   }, [id]);
+
+  const handlePrintCard = () => {
+    if (!student || !qrDataUrl) return;
+    printStudentCard({
+      studentName: student.name,
+      studentNumber: student.student_number,
+      gradeName: grade?.name,
+      groupName: group?.name,
+      qrDataUrl,
+      schoolName: profile?.subject_name || 'كارنيه الطالب',
+    });
+  };
 
   if (loading) return <div className="muted">جارِ التحميل...</div>;
   if (!student) return <div className="muted">الطالب غير موجود.</div>;
@@ -59,6 +91,7 @@ export default function StudentDetailPage() {
       <div className="tabs">
         <button className={tab === 'payments' ? 'active' : ''} onClick={() => setTab('payments')}>الاشتراكات</button>
         <button className={tab === 'attendance' ? 'active' : ''} onClick={() => setTab('attendance')}>الحضور</button>
+        <button className={tab === 'qr' ? 'active' : ''} onClick={() => setTab('qr')}>بطاقة QR</button>
       </div>
 
       {tab === 'payments' && (
@@ -104,6 +137,24 @@ export default function StudentDetailPage() {
               </span>
             </div>
           ))}
+        </div>
+      )}
+
+      {tab === 'qr' && (
+        <div className="card">
+          <div className="qr-card-box">
+            {qrDataUrl ? (
+              <img src={qrDataUrl} alt={`QR — ${student.name}`} />
+            ) : (
+              <div className="muted">جارِ توليد الكود...</div>
+            )}
+            <div className="muted" style={{ textAlign: 'center', fontSize: 13 }}>
+              كود خاص بالطالب — استخدمه في شاشة الحضور بالكاميرا لتسجيل حضوره تلقائياً.
+            </div>
+            <Button variant="primary" onClick={handlePrintCard} disabled={!qrDataUrl} style={{ width: '100%', justifyContent: 'center' }}>
+              🖨️ طباعة كارت الطالب
+            </Button>
+          </div>
         </div>
       )}
     </div>

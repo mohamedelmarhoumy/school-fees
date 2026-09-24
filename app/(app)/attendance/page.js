@@ -13,6 +13,7 @@ import SessionSummaryModal from '../../../lib/SessionSummaryModal';
 import { useProfile } from '../../../lib/useProfile';
 import { logActivity } from '../../../lib/activityLog';
 import { printReport } from '../../../lib/printReport';
+import AttendanceScannerModal from '../../../lib/AttendanceScannerModal';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -38,6 +39,7 @@ function AttendanceContent() {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const { profile, isOwner } = useProfile();
 
   useEffect(() => {
@@ -196,6 +198,15 @@ function AttendanceContent() {
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
 
+        <Button
+          variant="primary"
+          size="sm"
+          style={{ marginTop: 10, width: '100%', justifyContent: 'center' }}
+          onClick={() => setScannerOpen(true)}
+        >
+          📷 مسح كارت الطالب
+        </Button>
+
         {groupId && !loading && (
           <div className="row-between" style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
             <span className="muted">
@@ -226,6 +237,17 @@ function AttendanceContent() {
           </Button>
         )}
       </div>
+
+      <AttendanceScannerModal
+        open={scannerOpen}
+        onClose={() => {
+          setScannerOpen(false);
+          loadSession();
+        }}
+        date={date}
+        actorName={profile?.display_name || profile?.email}
+        onRecorded={() => loadSession()}
+      />
 
       <SessionSummaryModal
         open={summaryOpen}
