@@ -1,5 +1,6 @@
-const CACHE_NAME = 'school-app-shell-v4';
+const CACHE_NAME = 'school-app-shell-v5';
 const APP_SHELL = ['/manifest.json', '/favicon.ico', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-512-maskable.png', '/icons/logo-header.png'];
+const NAV_TIMEOUT_MS = 1500; // أقصى وقت ننتظره من شبكة ضعيفة قبل ما نستخدم النسخة المخزّنة فوراً
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -25,17 +26,45 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // صفحة الـ HTML نفسها (التنقل بين الشاشات): شبكة أولاً دايماً، عشان أي تحديث
-  // (زي تغيير الألوان أو الخط) يظهر فوراً من أول فتح، مش نسخة قديمة مخزّنة.
-  // الكاش بيتستخدم بس لو مفيش إنترنت خالص.
+  // صفحة الـ HTML نفسها (أول تحميل أو Refresh كامل): بنحاول الشبكة، لكن لو
+  // في نسخة مخزّنة من قبل ومفيش رد خلال وقت قصير (نت ضعيف جداً)، بنعرض
+  // النسخة المخزّنة فوراً عشان الشاشة تفتح بسرعة بدل ما تفضل بيضاء تستنى.
+  // لو الشبكة ردّت بعد كده بردو بنحدّث الكاش بهدوء للمرة الجاية.
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request).then((r) => r || caches.match('/')))
+      (async () => {
+        const cached = await caches.match(event.request).then((r) => r || caches.match('/'));
+        const networkPromise = fetch(event.request)
+          .then((response) => {
+            if (response && response.status === 200) {
+              const clone = response.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+            }
+            return response;
+          })
+          .catch(() => null);
+
+        if (!cached) {
+          // مفيش أي نسخة مخزّنة خالص — لازم نستنى الشبكة مهما طالت
+          const networkResponse = await networkPromise;
+          return networkResponse || new Response('تعذّر تحميل الصفحة — تأكد من الاتصال بالإنترنت.', {
+            status: 503,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+          });
+        }
+
+        // فيه نسخة مخزّنة: سباق بين الشبكة ومهلة قصيرة — أول واحد يوصل يكسب
+        const timeoutFallback = new Promise((resolve) => setTimeout(() => resolve(cached), NAV_TIMEOUT_MS));
+        const networkOrCache = networkPromise.then((r) => r || cached);
+        return Promise.race([networkOrCache, timeoutFallback]);
+      })()
     );
     return;
   }
 
-  // باقي الملفات الثابتة (أيقونات، manifest): كاش أولاً مع تحديث في الخلفية
+  // باقي الملفات الثابتة (JS/CSS مبنية، خطوط، أيقونات): كاش أولاً فوراً مع
+  // تحديث هادئ في الخلفية — أسرع طريقة ممكنة، ومناسبة لأن أسماء الملفات دي
+  // بيتغير الـ hash بتاعها مع كل نسخة جديدة من التطبيق.
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const networkFetch = fetch(event.request)

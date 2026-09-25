@@ -759,6 +759,49 @@ input[type="date"], input[type="time"] {
 .scanner-result-title { font-weight: 800; font-size: 15px; margin-bottom: 2px; }
 .scanner-result-sub { font-size: 13px; opacity: 0.95; }
 
+/* تنبيه: طالب حضر في موعد مجموعة غير مجموعته */
+.scanner-result.is-conflict {
+  background: #f59e0b;
+  color: #1f2937;
+  animation: conflictPulse 1.1s ease-in-out infinite;
+}
+.scanner-result.is-conflict .scanner-result-title,
+.scanner-result.is-conflict .scanner-result-sub { color: #1f2937; }
+.scanner-conflict-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.scanner-conflict-actions button {
+  flex: 1;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 8px;
+  font-weight: 800;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.scanner-conflict-btn-confirm { background: #1f2937; color: #fff; }
+.scanner-conflict-btn-cancel { background: rgba(31, 41, 55, 0.12); color: #1f2937; }
+@keyframes conflictPulse {
+  0%, 100% { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 0 0 rgba(245, 158, 11, 0.55); }
+  50% { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 0 8px rgba(245, 158, 11, 0); }
+}
+
+/* تعارض مواعيد المجموعات — بانر تحذيري عند إنشاء/تعديل مجموعة */
+.schedule-conflict-banner {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+[data-theme="dark"] .schedule-conflict-banner { color: #f87171; }
+
 .qr-card-box {
   display: flex;
   flex-direction: column;

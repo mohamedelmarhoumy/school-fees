@@ -1,6 +1,7 @@
 import { Tajawal } from 'next/font/google';
 import './globals.css';
 import ServiceWorkerRegister from './service-worker-register';
+import AppProviders from '../lib/AppProviders';
 
 const tajawal = Tajawal({
   subsets: ['arabic'],
@@ -46,7 +47,7 @@ export default function RootLayout({ children }) {
       </head>
       <body className={tajawal.className}>
         <ServiceWorkerRegister />
-        {children}
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

@@ -13,6 +13,7 @@
     "react-dom": "18.3.1",
     "@supabase/supabase-js": "2.45.4",
     "qrcode": "1.5.4",
-    "jsqr": "1.4.0"
+    "jsqr": "1.4.0",
+    "swr": "2.2.5"
   }
 }

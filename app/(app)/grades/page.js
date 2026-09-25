@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import useSWR from 'swr';
 import { supabase } from '../../../lib/supabaseClient';
 import { WEEKDAY_LABELS, SATURDAY_FIRST_ORDER } from '../../../lib/constants';
-import { scheduleLabel } from '../../../lib/schedule';
+import { scheduleLabel, formatTime12h } from '../../../lib/schedule';
 import Button from '../../../lib/Button';
 import { useProfile } from '../../../lib/useProfile';
 import EmptyState from '../../../lib/EmptyState';
@@ -13,6 +14,96 @@ import SlideUpModal from '../../../lib/SlideUpModal';
 import KebabMenu from '../../../lib/KebabMenu';
 
 const emptyGroupForm = { name: '', days: [], start_time: '', end_time: '' };
+
+function timeToMinutes(t) {
+  if (!t) return null;
+  const [hStr, mStr] = t.split(':');
+  const h = parseInt(hStr, 10);
+  if (isNaN(h)) return null;
+  return h * 60 + (parseInt(mStr, 10) || 0);
+}
+
+function daysOverlap(a = [], b = []) {
+  return a.some((d) => b.includes(d));
+}
+
+/** بيتلاقوا لو في يوم مشترك وفي تداخل فعلي بين الوقتين (مش بس نفس ساعة البداية) */
+function timeRangesOverlap(start1, end1, start2, end2) {
+  const s1 = timeToMinutes(start1);
+  const e1 = timeToMinutes(end1);
+  const s2 = timeToMinutes(start2);
+  const e2 = timeToMinutes(end2);
+  if (s1 == null || e1 == null || s2 == null || e2 == null) return false;
+  return s1 < e2 && s2 < e1;
+}
+
+/** بيدوّر على أول مجموعة قائمة بتتعارض في (الأيام + التوقيت) مع الفورم المُدخل، ما عدا المجموعة اللي بيتعدّلها المستخدم نفسها */
+function findScheduleConflict({ days, start_time, end_time, excludeGroupId, allGroups }) {
+  if (!days || days.length === 0 || !start_time || !end_time) return null;
+  return (
+    (allGroups || []).find((g) => {
+      if (g.id === excludeGroupId) return false;
+      if (!daysOverlap(days, g.days_of_week || [])) return false;
+      return timeRangesOverlap(start_time, end_time, g.start_time, g.end_time);
+    }) || null
+  );
+}
+
+/** رسالة التعارض بصيغة: ⛔ تعارض في الموعد: توجد مجموعة بالفعل في (السبت والإثنين الساعة 2:00 م). */
+function conflictMessage(group) {
+  const orderedDays = SATURDAY_FIRST_ORDER.filter((d) => (group.days_of_week || []).includes(d));
+  const dayNames = orderedDays.map((d) => WEEKDAY_LABELS[d]).join(' و');
+  const time = group.start_time ? formatTime12h(group.start_time) : '';
+  return `⛔ تعارض في الموعد: توجد مجموعة "${group.name}" بالفعل في (${dayNames} الساعة ${time}).`;
+}
+
+async function fetchGroupStats() {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+
+  const [{ data: students }, { data: attendance }, { data: payments }] = await Promise.all([
+    supabase.from('students').select('id, group_id'),
+    supabase.from('attendance').select('group_id, status').gte('date', monthStart),
+    supabase.from('payments').select('student_id, status').eq('year', now.getFullYear()).eq('month', now.getMonth() + 1),
+  ]);
+
+  const studentsByGroup = {};
+  const groupByStudent = {};
+  (students || []).forEach((s) => {
+    if (!s.group_id) return;
+    studentsByGroup[s.group_id] = (studentsByGroup[s.group_id] || 0) + 1;
+    groupByStudent[s.id] = s.group_id;
+  });
+
+  const attendanceByGroup = {};
+  (attendance || []).forEach((a) => {
+    if (!attendanceByGroup[a.group_id]) attendanceByGroup[a.group_id] = { present: 0, total: 0 };
+    attendanceByGroup[a.group_id].total += 1;
+    if (a.status === 'present') attendanceByGroup[a.group_id].present += 1;
+  });
+
+  const paymentsByGroup = {};
+  (payments || []).forEach((p) => {
+    const gid = groupByStudent[p.student_id];
+    if (!gid) return;
+    if (!paymentsByGroup[gid]) paymentsByGroup[gid] = { paid: 0, total: 0 };
+    paymentsByGroup[gid].total += 1;
+    if (p.status === 'paid') paymentsByGroup[gid].paid += 1;
+  });
+
+  const stats = {};
+  Object.keys(studentsByGroup).forEach((gid) => {
+    const att = attendanceByGroup[gid];
+    const pay = paymentsByGroup[gid];
+    stats[gid] = {
+      studentCount: studentsByGroup[gid],
+      attendanceRate: att && att.total > 0 ? Math.round((att.present / att.total) * 100) : null,
+      paidCount: pay?.paid || 0,
+      paidTotal: pay?.total || 0,
+    };
+  });
+  return stats;
+}
 
 function DaysPicker({ selectedDays, onToggle }) {
   return (
@@ -36,7 +127,7 @@ function DaysPicker({ selectedDays, onToggle }) {
   );
 }
 
-function GroupForm({ form, onChange, onToggleDay }) {
+function GroupForm({ form, onChange, onToggleDay, error }) {
   return (
     <div>
       <input
@@ -53,14 +144,12 @@ function GroupForm({ form, onChange, onToggleDay }) {
       </div>
       <div className="muted" style={{ marginTop: 10, marginBottom: 4 }}>أيام الأسبوع</div>
       <DaysPicker selectedDays={form.days} onToggle={onToggleDay} />
+      {error && <div className="schedule-conflict-banner">{error}</div>}
     </div>
   );
 }
 
 export default function GradesPage() {
-  const [grades, setGrades] = useState([]);
-  const [groupsByGrade, setGroupsByGrade] = useState({});
-  const [loading, setLoading] = useState(true);
   const [newGradeName, setNewGradeName] = useState('');
   const [newGradeFee, setNewGradeFee] = useState('');
   const [newGroupFormByGrade, setNewGroupFormByGrade] = useState({});
@@ -77,78 +166,29 @@ export default function GradesPage() {
   const [addGradeOpen, setAddGradeOpen] = useState(false);
   const [addGroupGradeId, setAddGroupGradeId] = useState(null);
   const [savingGroupEdit, setSavingGroupEdit] = useState(false);
+  const [newGroupError, setNewGroupError] = useState('');
+  const [editGroupError, setEditGroupError] = useState('');
   const { loading: profileLoading, isOwner } = useProfile();
-  const [groupStats, setGroupStats] = useState({});
-  const [loadingStats, setLoadingStats] = useState(true);
 
-  const loadAll = async () => {
-    setLoading(true);
-    const { data: gradesData } = await supabase.from('grades').select('*').order('name');
-    const { data: groupsData } = await supabase.from('groups_table').select('*').order('name');
-    setGrades(gradesData || []);
+  // ⚡ SWR: الصفوف والمجموعات بتظهر فوراً من آخر نسخة متخزّنة محلياً، وبعدين
+  // بتتحدّث بهدوء في الخلفية — مفيش شاشة بيضاء أو استنى للنت الضعيف.
+  const { data: gradesData, isLoading: loading, mutate: mutateAll } = useSWR('grades-index', async () => {
+    const { data: gradesRows } = await supabase.from('grades').select('*').order('name');
+    const { data: groupsRows } = await supabase.from('groups_table').select('*').order('name');
     const grouped = {};
-    (groupsData || []).forEach((g) => {
+    (groupsRows || []).forEach((g) => {
       if (!grouped[g.grade_id]) grouped[g.grade_id] = [];
       grouped[g.grade_id].push(g);
     });
-    setGroupsByGrade(grouped);
-    setLoading(false);
-  };
+    return { grades: gradesRows || [], groupsByGrade: grouped };
+  });
+  const grades = gradesData?.grades || [];
+  const groupsByGrade = gradesData?.groupsByGrade || {};
+  const allGroups = Object.values(groupsByGrade).flat();
+  const loadAll = () => mutateAll();
 
-  useEffect(() => {
-    loadAll();
-    loadStats();
-  }, []);
-
-  const loadStats = async () => {
-    setLoadingStats(true);
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-
-    const [{ data: students }, { data: attendance }, { data: payments }] = await Promise.all([
-      supabase.from('students').select('id, group_id'),
-      supabase.from('attendance').select('group_id, status').gte('date', monthStart),
-      supabase.from('payments').select('student_id, status').eq('year', now.getFullYear()).eq('month', now.getMonth() + 1),
-    ]);
-
-    const studentsByGroup = {};
-    const groupByStudent = {};
-    (students || []).forEach((s) => {
-      if (!s.group_id) return;
-      studentsByGroup[s.group_id] = (studentsByGroup[s.group_id] || 0) + 1;
-      groupByStudent[s.id] = s.group_id;
-    });
-
-    const attendanceByGroup = {};
-    (attendance || []).forEach((a) => {
-      if (!attendanceByGroup[a.group_id]) attendanceByGroup[a.group_id] = { present: 0, total: 0 };
-      attendanceByGroup[a.group_id].total += 1;
-      if (a.status === 'present') attendanceByGroup[a.group_id].present += 1;
-    });
-
-    const paymentsByGroup = {};
-    (payments || []).forEach((p) => {
-      const gid = groupByStudent[p.student_id];
-      if (!gid) return;
-      if (!paymentsByGroup[gid]) paymentsByGroup[gid] = { paid: 0, total: 0 };
-      paymentsByGroup[gid].total += 1;
-      if (p.status === 'paid') paymentsByGroup[gid].paid += 1;
-    });
-
-    const stats = {};
-    Object.keys(studentsByGroup).forEach((gid) => {
-      const att = attendanceByGroup[gid];
-      const pay = paymentsByGroup[gid];
-      stats[gid] = {
-        studentCount: studentsByGroup[gid],
-        attendanceRate: att && att.total > 0 ? Math.round((att.present / att.total) * 100) : null,
-        paidCount: pay?.paid || 0,
-        paidTotal: pay?.total || 0,
-      };
-    });
-    setGroupStats(stats);
-    setLoadingStats(false);
-  };
+  const { data: groupStatsData, isLoading: loadingStats } = useSWR('grades-group-stats', fetchGroupStats);
+  const groupStats = groupStatsData || {};
 
   const addGrade = async (e) => {
     e.preventDefault();
@@ -195,6 +235,21 @@ export default function GradesPage() {
   const addGroup = async (gradeId) => {
     const form = getNewGroupForm(gradeId);
     if (!form.name.trim()) return;
+
+    // ⛔ منع تضارب المواعيد: نفس الأيام + التوقيت مع مجموعة موجودة بالفعل
+    const conflict = findScheduleConflict({
+      days: form.days,
+      start_time: form.start_time,
+      end_time: form.end_time,
+      excludeGroupId: null,
+      allGroups,
+    });
+    if (conflict) {
+      setNewGroupError(conflictMessage(conflict));
+      return;
+    }
+    setNewGroupError('');
+
     setAddingGroupFor(gradeId);
     await supabase.from('groups_table').insert({
       grade_id: gradeId,
@@ -210,6 +265,7 @@ export default function GradesPage() {
   };
 
   const startEditGroup = (group) => {
+    setEditGroupError('');
     setEditingGroupId(group.id);
     setEditGroupForm({
       name: group.name,
@@ -220,12 +276,27 @@ export default function GradesPage() {
   };
 
   const toggleEditGroupDay = (dayIndex) => {
+    setEditGroupError('');
     const current = editGroupForm.days;
     const next = current.includes(dayIndex) ? current.filter((d) => d !== dayIndex) : [...current, dayIndex];
     setEditGroupForm({ ...editGroupForm, days: next });
   };
 
   const saveGroupEdit = async () => {
+    // ⛔ منع تضارب المواعيد: نفس الأيام + التوقيت مع مجموعة موجودة بالفعل (غير نفس المجموعة اللي بتتعدّل)
+    const conflict = findScheduleConflict({
+      days: editGroupForm.days,
+      start_time: editGroupForm.start_time,
+      end_time: editGroupForm.end_time,
+      excludeGroupId: editingGroupId,
+      allGroups,
+    });
+    if (conflict) {
+      setEditGroupError(conflictMessage(conflict));
+      return;
+    }
+    setEditGroupError('');
+
     setSavingGroupEdit(true);
     await supabase
       .from('groups_table')
@@ -369,7 +440,10 @@ export default function GradesPage() {
               variant="outline"
               size="sm"
               style={{ marginTop: 8, width: '100%', justifyContent: 'center' }}
-              onClick={() => setAddGroupGradeId(grade.id)}
+              onClick={() => {
+                setNewGroupError('');
+                setAddGroupGradeId(grade.id);
+              }}
             >
               + إضافة مجموعة
             </Button>
@@ -405,15 +479,25 @@ export default function GradesPage() {
 
       <SlideUpModal
         open={!!addGroupGradeId}
-        onClose={() => setAddGroupGradeId(null)}
+        onClose={() => {
+          setNewGroupError('');
+          setAddGroupGradeId(null);
+        }}
         title={`إضافة مجموعة${addGroupGrade ? ' — ' + addGroupGrade.name : ''}`}
       >
         {addGroupGradeId && (
           <div>
             <GroupForm
               form={getNewGroupForm(addGroupGradeId)}
-              onChange={(f) => setNewGroupFormByGrade((s) => ({ ...s, [addGroupGradeId]: f }))}
-              onToggleDay={(d) => toggleNewGroupDay(addGroupGradeId, d)}
+              onChange={(f) => {
+                setNewGroupError('');
+                setNewGroupFormByGrade((s) => ({ ...s, [addGroupGradeId]: f }));
+              }}
+              onToggleDay={(d) => {
+                setNewGroupError('');
+                toggleNewGroupDay(addGroupGradeId, d);
+              }}
+              error={newGroupError}
             />
             <Button
               loading={addingGroupFor === addGroupGradeId}
@@ -426,8 +510,23 @@ export default function GradesPage() {
         )}
       </SlideUpModal>
 
-      <SlideUpModal open={!!editingGroupId} onClose={() => setEditingGroupId(null)} title="تعديل المجموعة">
-        <GroupForm form={editGroupForm} onChange={setEditGroupForm} onToggleDay={toggleEditGroupDay} />
+      <SlideUpModal
+        open={!!editingGroupId}
+        onClose={() => {
+          setEditGroupError('');
+          setEditingGroupId(null);
+        }}
+        title="تعديل المجموعة"
+      >
+        <GroupForm
+          form={editGroupForm}
+          onChange={(f) => {
+            setEditGroupError('');
+            setEditGroupForm(f);
+          }}
+          onToggleDay={toggleEditGroupDay}
+          error={editGroupError}
+        />
         <Button loading={savingGroupEdit} style={{ marginTop: 12, width: '100%', justifyContent: 'center' }} onClick={saveGroupEdit}>
           حفظ التعديل
         </Button>

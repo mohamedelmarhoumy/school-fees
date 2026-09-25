@@ -1,7 +1,8 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import useSWR from 'swr';
 import { supabase } from '../../../lib/supabaseClient';
 import { buildWhatsAppLink } from '../../../lib/whatsapp';
 import { ATTENDANCE_STATUS_LABELS } from '../../../lib/constants';
@@ -35,33 +36,42 @@ function AttendanceContent() {
   const [gradeId, setGradeId] = useState('');
   const [groupId, setGroupId] = useState('');
   const [date, setDate] = useState(presetDate || todayStr());
-  const [rows, setRows] = useState([]); // { student, record, unpaid }
-  const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const { profile, isOwner } = useProfile();
+  const didInitGrade = useRef(false);
+
+  // ⚡ الصفوف والمجموعات: SWR بيرجّع آخر نسخة معروفة فوراً من الكاش المحلي
+  // (حتى من غير نت) وبعدين يحدّثها بهدوء في الخلفية.
+  const { data: gradesGroupsData } = useSWR('grades-groups-index', async () => {
+    const [{ data: gradesData }, { data: groupsData }] = await Promise.all([
+      supabase.from('grades').select('*').order('name'),
+      supabase.from('groups_table').select('*').order('name'),
+    ]);
+    return { grades: gradesData || [], groups: groupsData || [] };
+  });
 
   useEffect(() => {
-    const loadGradesGroups = async () => {
-      const { data: gradesData } = await supabase.from('grades').select('*').order('name');
-      const { data: groupsData } = await supabase.from('groups_table').select('*').order('name');
-      setGrades(gradesData || []);
-      setGroups(groupsData || []);
+    if (!gradesGroupsData) return;
+    setGrades(gradesGroupsData.grades);
+    setGroups(gradesGroupsData.groups);
+    if (didInitGrade.current) return; // نحدّد الصف/المجموعة الافتراضيين مرة واحدة بس
 
-      if (presetGroupId) {
-        const presetGroup = (groupsData || []).find((g) => g.id === presetGroupId);
-        if (presetGroup) {
-          setGradeId(presetGroup.grade_id);
-          setGroupId(presetGroup.id);
-          return;
-        }
+    if (presetGroupId) {
+      const presetGroup = gradesGroupsData.groups.find((g) => g.id === presetGroupId);
+      if (presetGroup) {
+        setGradeId(presetGroup.grade_id);
+        setGroupId(presetGroup.id);
+        didInitGrade.current = true;
+        return;
       }
-      if (gradesData && gradesData.length > 0 && !gradeId) setGradeId(gradesData[0].id);
-    };
-    loadGradesGroups();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    }
+    if (gradesGroupsData.grades.length > 0) {
+      setGradeId(gradesGroupsData.grades[0].id);
+      didInitGrade.current = true;
+    }
+  }, [gradesGroupsData, presetGroupId]);
 
   const groupsForGrade = groups.filter((g) => g.grade_id === gradeId);
 
@@ -74,13 +84,8 @@ function AttendanceContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gradeId, groups]);
 
-  const loadSession = async () => {
-    if (!groupId) {
-      setRows([]);
-      return;
-    }
-    setLoading(true);
-
+  const sessionKey = groupId ? `attendance-session:${groupId}:${date}` : null;
+  const loadSessionData = async () => {
     const { data: students } = await supabase.from('students').select('*').eq('group_id', groupId).order('name');
     const { data: existingRecords } = await supabase
       .from('attendance')
@@ -115,34 +120,58 @@ function AttendanceContent() {
       paymentsByStudent[p.student_id] = p;
     });
 
-    const combined = (students || [])
+    return (students || [])
       .map((s) => ({
         student: s,
         record: recordsByStudent[s.id],
         unpaid: paymentsByStudent[s.id] && paymentsByStudent[s.id].status !== 'paid',
       }))
       .sort((a, b) => a.student.name.localeCompare(b.student.name));
-
-    setRows(combined);
-    setLoading(false);
   };
 
-  useEffect(() => {
-    loadSession();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId, date]);
+  // ⚡ نفس فكرة الـ Stale-While-Revalidate: لو الجلسة دي اتفتحت قبل كده، تظهر
+  // فوراً من الكاش، وفي الخلفية بيتعمل تحديث هادئ من السيرفر.
+  const { data: rowsData, isLoading: sessionLoading, mutate: mutateSession } = useSWR(
+    sessionKey,
+    loadSessionData
+  );
+  const rows = rowsData || [];
+  const loading = !!groupId && sessionLoading && !rowsData;
 
   const setStatus = async (row, status) => {
-    await supabase
-      .from('attendance')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', row.record.id);
-    logActivity(
-      profile?.display_name || profile?.email,
-      'attendance',
-      `${row.student.name} — ${ATTENDANCE_STATUS_LABELS[status]} (${date})`
+    // ⚡ تحديث فوري في الواجهة قبل أي رد من السيرفر
+    mutateSession(
+      (current) =>
+        (current || []).map((r) =>
+          r.student.id === row.student.id ? { ...r, record: { ...r.record, status } } : r
+        ),
+      false
     );
-    loadSession();
+    try {
+      await supabase
+        .from('attendance')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', row.record.id);
+      logActivity(
+        profile?.display_name || profile?.email,
+        'attendance',
+        `${row.student.name} — ${ATTENDANCE_STATUS_LABELS[status]} (${date})`
+      );
+    } finally {
+      mutateSession();
+    }
+  };
+
+  // بيتنفّذ فور ما ماسح الـ QR يسجّل طالب حاضر — بيحدّث نفس الشاشة فوراً
+  // من غير ما يستنى إعادة تحميل كاملة من السيرفر.
+  const applyOptimisticPresent = (studentId) => {
+    mutateSession(
+      (current) =>
+        (current || []).map((r) =>
+          r.student.id === studentId ? { ...r, record: { ...(r.record || {}), status: 'present' } } : r
+        ),
+      false
+    );
   };
 
   const exportAttendance = async () => {
@@ -242,11 +271,13 @@ function AttendanceContent() {
         open={scannerOpen}
         onClose={() => {
           setScannerOpen(false);
-          loadSession();
+          mutateSession(); // مزامنة هادئة في الخلفية بعد قفل الماسح، للتأكد إن كل حاجة اتسجّلت فعلاً
         }}
         date={date}
         actorName={profile?.display_name || profile?.email}
-        onRecorded={() => loadSession()}
+        onRecorded={(studentId) => applyOptimisticPresent(studentId)}
+        activeGroupId={groupId}
+        groups={groups}
       />
 
       <SessionSummaryModal

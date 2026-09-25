@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import useSWR from 'swr';
 import { supabase } from '../../../lib/supabaseClient';
 import { scheduleLabel } from '../../../lib/schedule';
 import Button from '../../../lib/Button';
@@ -15,11 +16,25 @@ import { buildWhatsAppLink } from '../../../lib/whatsapp';
 import { IconPencil, IconTrash } from '../../../lib/icons';
 import SlideUpModal from '../../../lib/SlideUpModal';
 
+async function fetchStudentsPageData() {
+  const [{ data: studentsData }, { data: gradesData }, { data: groupsData }] = await Promise.all([
+    supabase.from('students').select('*').order('name'),
+    supabase.from('grades').select('*').order('name'),
+    supabase.from('groups_table').select('*').order('name'),
+  ]);
+  return { students: studentsData || [], grades: gradesData || [], groups: groupsData || [] };
+}
+
 export default function StudentsPage() {
-  const [students, setStudents] = useState([]);
-  const [grades, setGrades] = useState([]);
-  const [groups, setGroups] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // ⚡ SWR: أول ما الشاشة تتفتح بتعرض فوراً آخر نسخة متخزّنة محلياً (حتى بدون
+  // نت)، وفي نفس الوقت بتطلب نسخة جديدة من السيرفر بهدوء في الخلفية.
+  const { data, isLoading, mutate } = useSWR('students-page-index', fetchStudentsPageData);
+  const students = data?.students || [];
+  const grades = data?.grades || [];
+  const groups = data?.groups || [];
+  const loading = isLoading && !data;
+  const loadAll = () => mutate();
+
   const [search, setSearch] = useState('');
 
   const emptyForm = { name: '', student_number: '', parent_phone: '', grade_id: '', group_id: '' };
@@ -33,23 +48,6 @@ export default function StudentsPage() {
   const [importSummary, setImportSummary] = useState(null);
   const [justAdded, setJustAdded] = useState(null);
   const [addStudentOpen, setAddStudentOpen] = useState(false);
-
-  const loadAll = async () => {
-    setLoading(true);
-    const [{ data: studentsData }, { data: gradesData }, { data: groupsData }] = await Promise.all([
-      supabase.from('students').select('*').order('name'),
-      supabase.from('grades').select('*').order('name'),
-      supabase.from('groups_table').select('*').order('name'),
-    ]);
-    setStudents(studentsData || []);
-    setGrades(gradesData || []);
-    setGroups(groupsData || []);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    loadAll();
-  }, []);
 
   // سيريال تلقائي: رقم الطالب داخل نفس المجموعة (لا يمكن إدخاله يدوياً)
   useEffect(() => {
