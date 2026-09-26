@@ -13,7 +13,7 @@ import BulkWhatsAppModal from '../../../lib/BulkWhatsAppModal';
 import SlideUpModal from '../../../lib/SlideUpModal';
 import KebabMenu from '../../../lib/KebabMenu';
 
-const emptyGroupForm = { name: '', days: [], start_time: '', end_time: '' };
+const emptyGroupForm = { name: '', days: [], start_time: '', end_time: '', grace_period_minutes: 15 };
 
 function timeToMinutes(t) {
   if (!t) return null;
@@ -144,6 +144,17 @@ function GroupForm({ form, onChange, onToggleDay, error }) {
       </div>
       <div className="muted" style={{ marginTop: 10, marginBottom: 4 }}>أيام الأسبوع</div>
       <DaysPicker selectedDays={form.days} onToggle={onToggleDay} />
+      <div className="muted" style={{ marginTop: 10, marginBottom: 4 }}>
+        مدة سماح التأخير عند مسح الباركود (بالدقائق)
+      </div>
+      <input
+        type="number"
+        min="0"
+        step="1"
+        value={form.grace_period_minutes ?? 15}
+        onChange={(e) => onChange({ ...form, grace_period_minutes: e.target.value === '' ? '' : Number(e.target.value) })}
+        style={{ width: 100 }}
+      />
       {error && <div className="schedule-conflict-banner">{error}</div>}
     </div>
   );
@@ -257,6 +268,7 @@ export default function GradesPage() {
       days_of_week: form.days,
       start_time: form.start_time || null,
       end_time: form.end_time || null,
+      grace_period_minutes: Number.isFinite(Number(form.grace_period_minutes)) ? Number(form.grace_period_minutes) : 15,
     });
     setNewGroupFormByGrade((s) => ({ ...s, [gradeId]: emptyGroupForm }));
     await loadAll();
@@ -272,6 +284,7 @@ export default function GradesPage() {
       days: group.days_of_week || [],
       start_time: group.start_time ? group.start_time.slice(0, 5) : '',
       end_time: group.end_time ? group.end_time.slice(0, 5) : '',
+      grace_period_minutes: Number.isFinite(group.grace_period_minutes) ? group.grace_period_minutes : 15,
     });
   };
 
@@ -305,6 +318,9 @@ export default function GradesPage() {
         days_of_week: editGroupForm.days,
         start_time: editGroupForm.start_time || null,
         end_time: editGroupForm.end_time || null,
+        grace_period_minutes: Number.isFinite(Number(editGroupForm.grace_period_minutes))
+          ? Number(editGroupForm.grace_period_minutes)
+          : 15,
         updated_at: new Date().toISOString(),
       })
       .eq('id', editingGroupId);

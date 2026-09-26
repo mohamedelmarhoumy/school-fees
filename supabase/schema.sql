@@ -89,6 +89,8 @@ create table if not exists groups_table (
   days_of_week smallint[] not null default '{}',
   start_time time,
   end_time time,
+  -- مدة سماح التأخير بالدقائق قبل ما الطالب يتسجّل "متأخر" بدل "حاضر" عند مسح الباركود
+  grace_period_minutes int not null default 15,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -126,7 +128,10 @@ create table if not exists attendance (
   student_id uuid not null references students(id) on delete cascade,
   group_id uuid not null references groups_table(id) on delete cascade,
   date date not null,
-  status text not null default 'present',
+  -- الحالة الافتراضية "غائب": الطالب بيتحوّل لـ "حاضر"/"متأخر" فقط لما يتمسح له باركود
+  status text not null default 'absent',
+  -- وقت مسح الباركود الفعلي لكل طالب (للمراجعة والتقارير)
+  scanned_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (student_id, date)

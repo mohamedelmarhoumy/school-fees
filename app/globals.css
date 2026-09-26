@@ -755,6 +755,7 @@ input[type="date"], input[type="time"] {
 }
 .scanner-result.is-success { background: #16a34a; }
 .scanner-result.is-unpaid { background: #ea580c; }
+.scanner-result.is-late { background: #0891b2; }
 .scanner-result.is-error { background: #dc2626; }
 .scanner-result-title { font-weight: 800; font-size: 15px; margin-bottom: 2px; }
 .scanner-result-sub { font-size: 13px; opacity: 0.95; }

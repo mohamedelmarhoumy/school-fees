@@ -98,9 +98,11 @@ function AttendanceContent() {
       recordsByStudent[r.student_id] = r;
     });
 
+    // الحالة الافتراضية لكل طالب عند بداية الحصة: "غائب" — بتتحول "حاضر"/"متأخر"
+    // تلقائياً بس لما يتمسح له باركود.
     const toInsert = (students || [])
       .filter((s) => !recordsByStudent[s.id])
-      .map((s) => ({ student_id: s.id, group_id: groupId, date, status: 'present' }));
+      .map((s) => ({ student_id: s.id, group_id: groupId, date, status: 'absent' }));
 
     if (toInsert.length > 0) {
       const { data: inserted } = await supabase.from('attendance').insert(toInsert).select();
@@ -162,13 +164,13 @@ function AttendanceContent() {
     }
   };
 
-  // بيتنفّذ فور ما ماسح الـ QR يسجّل طالب حاضر — بيحدّث نفس الشاشة فوراً
+  // بيتنفّذ فور ما ماسح الـ QR يسجّل طالب حاضر أو متأخر — بيحدّث نفس الشاشة فوراً
   // من غير ما يستنى إعادة تحميل كاملة من السيرفر.
-  const applyOptimisticPresent = (studentId) => {
+  const applyOptimisticScan = (studentId, status) => {
     mutateSession(
       (current) =>
         (current || []).map((r) =>
-          r.student.id === studentId ? { ...r, record: { ...(r.record || {}), status: 'present' } } : r
+          r.student.id === studentId ? { ...r, record: { ...(r.record || {}), status } } : r
         ),
       false
     );
@@ -187,7 +189,7 @@ function AttendanceContent() {
 
   const exportAttendancePdf = () => {
     const groupName = groupsForGrade.find((g) => g.id === groupId)?.name || '';
-    const pdfRows = rows.map((r) => [r.student.name, ATTENDANCE_STATUS_LABELS[r.record?.status || 'present']]);
+    const pdfRows = rows.map((r) => [r.student.name, ATTENDANCE_STATUS_LABELS[r.record?.status || 'absent']]);
     printReport({
       title: `كشف حضور — ${groupName}`,
       subtitle: `حصتي — التاريخ: ${date}`,
@@ -197,8 +199,8 @@ function AttendanceContent() {
     });
   };
 
-  const presentCount = rows.filter((r) => (r.record?.status || 'present') === 'present').length;
-  const absentCount = rows.filter((r) => r.record?.status === 'absent').length;
+  const presentCount = rows.filter((r) => r.record?.status === 'present').length;
+  const absentCount = rows.filter((r) => (r.record?.status || 'absent') === 'absent').length;
   const lateCount = rows.filter((r) => r.record?.status === 'late').length;
 
   if (profileLoading) return <div className="muted">جارِ التحميل...</div>;
@@ -277,7 +279,7 @@ function AttendanceContent() {
         }}
         date={date}
         actorName={profile?.display_name || profile?.email}
-        onRecorded={(studentId) => applyOptimisticPresent(studentId)}
+        onRecorded={(studentId, status) => applyOptimisticScan(studentId, status)}
         activeGroupId={groupId}
         groups={groups}
       />
@@ -299,7 +301,7 @@ function AttendanceContent() {
 
       {!loading &&
         rows.map((row) => {
-          const status = row.record?.status || 'present';
+          const status = row.record?.status || 'absent';
           const hasPhone = !!row.student.parent_phone;
           return (
             <div key={row.student.id} className="card row-between">
