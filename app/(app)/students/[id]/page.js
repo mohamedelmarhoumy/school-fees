@@ -12,6 +12,7 @@ import {
 } from '../../../../lib/constants';
 import { monthlyAttendanceSummary, currentMonthPayment, scoresSummary } from '../../../../lib/studentSummary';
 import { studentQrDataUrl } from '../../../../lib/qr';
+import { siteUrl } from '../../../../lib/siteUrl';
 import { printStudentCard } from '../../../../lib/printStudentCard';
 import { buildWhatsAppLink } from '../../../../lib/whatsapp';
 import { logActivity } from '../../../../lib/activityLog';
@@ -75,8 +76,8 @@ export default function StudentDetailPage() {
       const { data: groupData } = await supabase.from('groups_table').select('*').eq('id', studentData.group_id).single();
       setGroup(groupData || null);
     }
-    if (studentData?.id) {
-      setQrDataUrl(await studentQrDataUrl(studentData.id));
+    if (studentData?.parent_token) {
+      setQrDataUrl(await studentQrDataUrl(siteUrl(), studentData.parent_token));
     }
     setLoading(false);
   };
@@ -169,7 +170,7 @@ export default function StudentDetailPage() {
   const absentCount = attendance.filter((a) => a.status === 'absent').length;
   const lateCount = attendance.filter((a) => a.status === 'late').length;
 
-  const parentLink = student.parent_token && typeof window !== 'undefined' ? `${window.location.origin}/p/${student.parent_token}` : '';
+  const parentLink = student.parent_token ? `${siteUrl()}/p/${student.parent_token}` : '';
   const parentGreeting = student.parent_name ? `مرحباً ${student.parent_name}` : 'مرحباً';
   const parentMessage = `${parentGreeting}، يمكنك متابعة حضور ودرجات واشتراك الطالب ${student.name} عبر الملف الإلكتروني التالي: ${parentLink}`;
 
@@ -334,7 +335,7 @@ export default function StudentDetailPage() {
               <div className="muted">جارِ توليد الكود...</div>
             )}
             <div className="muted" style={{ textAlign: 'center', fontSize: 13 }}>
-              كود خاص بالطالب — استخدمه في شاشة الحضور بالكاميرا لتسجيل حضوره تلقائياً.
+              كود ذكي: مسحه من شاشة الحضور بالتطبيق بيسجّل الحضور فوراً — ومسحه بكاميرا موبايل عادية بيفتح صفحة متابعة الطالب لولي الأمر مباشرة.
             </div>
             <Button variant="primary" onClick={handlePrintCard} disabled={!qrDataUrl} style={{ width: '100%', justifyContent: 'center' }}>
               🖨️ طباعة كارت الطالب
