@@ -37,7 +37,7 @@ export default function StudentsPage() {
 
   const [search, setSearch] = useState('');
 
-  const emptyForm = { name: '', student_number: '', parent_phone: '', grade_id: '', group_id: '' };
+  const emptyForm = { name: '', student_number: '', parent_phone: '', parent_name: '', grade_id: '', group_id: '' };
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -79,6 +79,7 @@ export default function StudentsPage() {
       name: form.name.trim(),
       student_number: form.student_number || null,
       parent_phone: form.parent_phone.trim() || null,
+      parent_name: form.parent_name.trim() || null,
       grade_id: form.grade_id || null,
       group_id: form.group_id || null,
     };
@@ -105,6 +106,7 @@ export default function StudentsPage() {
       name: student.name,
       student_number: student.student_number || '',
       parent_phone: student.parent_phone || '',
+      parent_name: student.parent_name || '',
       grade_id: student.grade_id || '',
       group_id: student.group_id || '',
     });
@@ -318,6 +320,14 @@ export default function StudentsPage() {
             onChange={(e) => setForm({ ...form, parent_phone: e.target.value })}
             style={{ flex: 1 }}
           />
+          <input
+            placeholder="اسم ولي الأمر (اختياري)"
+            value={form.parent_name}
+            onChange={(e) => setForm({ ...form, parent_name: e.target.value })}
+            style={{ flex: 1 }}
+          />
+        </div>
+        <div className="row" style={{ marginTop: 8 }}>
           <select
             value={form.grade_id}
             onChange={(e) => setForm({ ...form, grade_id: e.target.value, group_id: '' })}

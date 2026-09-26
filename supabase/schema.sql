@@ -257,3 +257,35 @@ create policy "owner read log" on activity_log for select
 
 create policy "team write log" on activity_log for insert
   with check (teacher_id = effective_teacher_id());
+
+-- ============================================================
+-- 7) الملف الإلكتروني الشامل للطالب: درجات الكويزات/الواجبات + رابط متابعة عام لولي الأمر
+-- ============================================================
+create table if not exists student_scores (
+  id uuid primary key default gen_random_uuid(),
+  teacher_id uuid not null default effective_teacher_id() references auth.users(id) on delete cascade,
+  student_id uuid not null references students(id) on delete cascade,
+  quiz_date date not null default current_date,
+  lesson_name text not null,
+  score numeric not null default 0,
+  max_score numeric not null default 10,
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_scores_student on student_scores (student_id, quiz_date desc);
+create index if not exists idx_scores_teacher on student_scores (teacher_id);
+
+alter table student_scores enable row level security;
+
+create policy "team read" on student_scores for select using (teacher_id = effective_teacher_id());
+create policy "scores write" on student_scores for insert with check (teacher_id = effective_teacher_id() and (is_owner() or has_perm('students')));
+create policy "scores update" on student_scores for update using (teacher_id = effective_teacher_id() and (is_owner() or has_perm('students'))) with check (teacher_id = effective_teacher_id() and (is_owner() or has_perm('students')));
+create policy "scores delete" on student_scores for delete using (teacher_id = effective_teacher_id() and (is_owner() or has_perm('students')));
+
+-- رابط متابعة آمن لولي الأمر (بدون تسجيل دخول) عبر صفحة /p/[token]، تُقرأ من
+-- السيرفر بمفتاح service_role فقط (يتخطى RLS عمداً لصف الطالب المطابق للتوكن فقط)
+alter table students add column if not exists parent_token uuid not null default gen_random_uuid();
+alter table students add column if not exists parent_name text;
+create unique index if not exists idx_students_parent_token on students (parent_token);
