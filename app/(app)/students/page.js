@@ -214,7 +214,14 @@ export default function StudentsPage() {
 
   return (
     <div>
-      <h2>الطلاب</h2>
+      <div className="row-between">
+        <h2>الطلاب</h2>
+        {canEdit && (
+          <Link href="/quiz-grading" className="btn2 btn2-outline btn2-sm">
+            📝 رصد درجات جماعي
+          </Link>
+        )}
+      </div>
 
       {justAdded && (
         <div className="card" style={{ borderRight: '3px solid #16a34a' }}>

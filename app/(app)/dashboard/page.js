@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import { WEEKDAY_LABELS, ARABIC_MONTHS } from '../../../lib/constants';
 import { formatTime12h } from '../../../lib/schedule';
@@ -28,6 +29,7 @@ function formatRemaining(minutes) {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [todaysGroups, setTodaysGroups] = useState([]);
   const [groupStats, setGroupStats] = useState({});
   const [loading, setLoading] = useState(true);
@@ -148,11 +150,26 @@ export default function DashboardPage() {
             >
               <div className="row-between">
                 <strong>{g.grades?.name} — {g.name}</strong>
-                {(isLive || isUpcoming) && (
-                  <span className="badge" style={{ background: isLive ? '#16a34a' : 'var(--accent)' }}>
-                    {isLive ? 'مباشر' : 'قادمة'}
-                  </span>
-                )}
+                <div className="row" style={{ gap: 6 }}>
+                  {(isLive || isUpcoming) && (
+                    <span className="badge" style={{ background: isLive ? '#16a34a' : 'var(--accent)' }}>
+                      {isLive ? 'مباشر' : 'قادمة'}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="btn2 btn2-outline btn2-sm"
+                    style={{ padding: '4px 8px', fontSize: 11.5 }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      router.push(`/quiz-grading?groupId=${g.id}`);
+                    }}
+                    title="رصد درجات جماعي لهذه المجموعة"
+                  >
+                    📝 درجات
+                  </button>
+                </div>
               </div>
               <div className="muted group-card-details row" style={{ gap: 6 }}>
                 <span>👥 {stats.studentCount} طالب</span>
