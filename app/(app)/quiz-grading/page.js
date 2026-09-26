@@ -38,7 +38,7 @@ function playBeep(ok = true) {
 
 export default function QuizGradingPage() {
   const searchParams = useSearchParams();
-  const { profile, isOwner } = useProfile();
+  const { profile, isOwner, loading: profileLoading } = useProfile();
   const canManage = isOwner || !!profile?.can_students;
 
   const [groups, setGroups] = useState([]);
@@ -194,6 +194,8 @@ export default function QuizGradingPage() {
   );
 
   const canSave = groupId && quizName.trim() && Number(maxScore) > 0 && gradedCount > 0 && !saving;
+
+  if (profileLoading) return <div className="muted">جارِ التحميل...</div>;
 
   if (!canManage) {
     return <EmptyState title="غير مصرح لك بالدخول هنا" hint="رصد الدرجات للمدرس أو المساعد اللي له صلاحية الطلاب بس." />;

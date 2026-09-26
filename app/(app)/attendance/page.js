@@ -39,7 +39,7 @@ function AttendanceContent() {
   const [exporting, setExporting] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
-  const { profile, isOwner } = useProfile();
+  const { profile, isOwner, loading: profileLoading } = useProfile();
   const didInitGrade = useRef(false);
 
   // ⚡ الصفوف والمجموعات: SWR بيرجّع آخر نسخة معروفة فوراً من الكاش المحلي
@@ -200,6 +200,8 @@ function AttendanceContent() {
   const presentCount = rows.filter((r) => (r.record?.status || 'present') === 'present').length;
   const absentCount = rows.filter((r) => r.record?.status === 'absent').length;
   const lateCount = rows.filter((r) => r.record?.status === 'late').length;
+
+  if (profileLoading) return <div className="muted">جارِ التحميل...</div>;
 
   if (!isOwner && !profile?.can_attendance) {
     return <EmptyState title="غير مصرح لك بالدخول هنا" hint="مفيش صلاحية تسجيل الحضور على حسابك." />;

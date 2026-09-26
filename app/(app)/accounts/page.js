@@ -44,7 +44,7 @@ export default function AccountsPage() {
   const [loadingToday, setLoadingToday] = useState(true);
   const [trendData, setTrendData] = useState([]);
   const [loadingTrend, setLoadingTrend] = useState(true);
-  const { profile, isOwner } = useProfile();
+  const { profile, isOwner, loading: profileLoading } = useProfile();
   const canManagePayments = isOwner || !!profile?.can_payments;
   const canViewFinancials = isOwner || !!profile?.can_view_financials;
   const [tab, setTab] = useState(null);
@@ -58,9 +58,10 @@ export default function AccountsPage() {
   const [savingExpense, setSavingExpense] = useState(false);
 
   useEffect(() => {
+    if (profileLoading) return; // منستنى نعرف الصلاحيات الحقيقية قبل ما نحدد التبويب الافتراضي
     if (tab === null) setTab(canManagePayments ? 'subscriptions' : 'expenses');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canManagePayments, canViewFinancials]);
+  }, [canManagePayments, canViewFinancials, profileLoading]);
 
   const computeStatus = (due, paid, discount) => {
     const covered = Number(paid) + Number(discount);
@@ -137,10 +138,11 @@ export default function AccountsPage() {
   };
 
   useEffect(() => {
+    if (profileLoading) return; // منستنى نعرف الصلاحيات الحقيقية الأول عشان مانحكمش غلط إن مفيش صلاحية
     if (canManagePayments) load(); else setLoading(false);
     if (canViewFinancials) loadExpenses(); else setLoadingExpenses(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, month]);
+  }, [year, month, profileLoading, canManagePayments, canViewFinancials]);
 
   const loadTrend = async () => {
     setLoadingTrend(true);
@@ -171,10 +173,11 @@ export default function AccountsPage() {
   };
 
   useEffect(() => {
+    if (profileLoading) return;
     if (canManagePayments) loadTodayTransactions(); else setLoadingToday(false);
     if (canViewFinancials) loadTrend(); else setLoadingTrend(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [profileLoading, canManagePayments, canViewFinancials]);
 
   const startEdit = (row) => {
     setEditingStudentId(row.student.id);
@@ -338,6 +341,15 @@ export default function AccountsPage() {
   const netProfit = totalPaid - totalExpenses;
 
   const todayTotal = todayTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+
+  if (profileLoading) {
+    return (
+      <div>
+        <h2>الحسابات</h2>
+        <SkeletonCards count={4} />
+      </div>
+    );
+  }
 
   if (!canManagePayments && !canViewFinancials) {
     return <EmptyState title="غير مصرح لك بالدخول هنا" hint="مفيش صلاحية تحصيل أو اطّلاع مالي على حسابك." />;
